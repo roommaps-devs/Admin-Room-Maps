@@ -79,7 +79,7 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-8 bg-gradient-to-br from-blue-600 to-purple-600 text-white relative">
+        <div className="px-6 py-8 bg-black text-white relative">
           {/* Back button */}
           <button
             onClick={() => router.back()}
