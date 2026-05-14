@@ -1,6 +1,6 @@
 import { getCookie } from "cookies-next";
 
-const baseURL = `http://localhost:8000/api`;
+const baseURL = process.env.NEXT_PUBLIC_BACKEND_URL!;
 
 export async function postRequest<T = any>(
   endpoint: string,
