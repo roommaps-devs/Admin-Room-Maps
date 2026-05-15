@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 };
 
 import StoreProvider from "@/store/StoreProvider";
+import Header from "@/components/Header";
 
 export default function RootLayout({
   children,
@@ -33,6 +34,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <StoreProvider>
+          <Header />
           {children}
           <Toaster />
         </StoreProvider>
