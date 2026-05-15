@@ -41,7 +41,7 @@ export default function Register() {
       const res = await postRequest<ApiResponse>("/auth/register", data);
       ResponseMessage(res);
       if (res.success) {
-        router.push("/");
+        router.push("/login");
       }
     } catch (err) {
       catchResponseMessage(err);
@@ -142,7 +142,7 @@ export default function Register() {
           <p className="text-center text-gray-600 text-sm">
             Already have an account?{" "}
             <Link
-              href="/"
+              href="/login"
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
               Log in here

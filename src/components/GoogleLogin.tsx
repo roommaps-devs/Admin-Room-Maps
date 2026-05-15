@@ -117,7 +117,7 @@ export default function GoogleLogin() {
             dispatch(setUser(verifyRes.data?.user || verifyRes.data || data.data?.user));
             router.push("/dashboard");
           } else {
-            router.push("/");
+            router.push("/login");
           }
         }
       }

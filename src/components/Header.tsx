@@ -15,9 +15,6 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Hide header on auth pages
-  const isAuthPage = pathname === "/" || pathname === "/register";
-
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -33,10 +30,8 @@ export default function Header() {
     deleteCookie("drive_access_token");
     dispatch(clearUser());
     setDropdownOpen(false);
-    router.push("/");
+    router.push("/login");
   };
-
-  if (isAuthPage) return null;
 
   // Get user initials for avatar fallback
   const getInitials = (name?: string, email?: string) => {
@@ -146,7 +141,7 @@ export default function Header() {
             </div>
           ) : (
             <Link
-              href="/"
+              href="/login"
               className="inline-flex items-center px-5 py-2 text-sm font-semibold text-white bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-lg no-underline transition-all duration-200 shadow-[0_2px_8px_rgba(26,26,46,0.25)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(26,26,46,0.35)]"
             >
               Login
