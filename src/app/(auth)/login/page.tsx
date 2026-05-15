@@ -50,7 +50,7 @@ export default function Login() {
       dispatch(setUser(res.data?.user || res.data || userData));
       router.push("/dashboard");
     }else{
-      router.push("/");
+      router.push("/login");
     }
   }
 };
