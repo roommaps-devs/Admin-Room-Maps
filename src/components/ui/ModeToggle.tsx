@@ -8,14 +8,21 @@ export type AppMode = 'rent' | 'travelers';
 interface ModeToggleProps {
   mode: AppMode;
   onChange: (mode: AppMode) => void;
+  variant?: 'default' | 'map';
+  className?: string;
 }
 
-export default function ModeToggle({ mode, onChange }: ModeToggleProps) {
+export default function ModeToggle({ mode, onChange, variant = 'default', className }: ModeToggleProps) {
+  const isMap = variant === 'map';
   const rentActive = mode === 'rent';
   const travelActive = mode === 'travelers';
 
   return (
-    <div className="relative flex items-center p-1 rounded-full h-[42px] bg-[var(--bg-surface)] border border-[var(--glass-border)] w-full max-w-[280px] shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]">
+    <div className={cn(
+      "relative flex items-center p-1 rounded-full bg-[var(--bg-surface)] border border-[var(--glass-border)] w-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]",
+      isMap ? "h-[36px] max-w-[220px]" : "h-[42px] max-w-[280px]",
+      className
+    )}>
       {/* Selection Slider with Glow */}
       <div
         className={cn(
@@ -30,12 +37,13 @@ export default function ModeToggle({ mode, onChange }: ModeToggleProps) {
       <button
         onClick={() => onChange('rent')}
         className={cn(
-          "group/rent relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold text-[13px] transition-all duration-300 outline-none",
+          "group/rent relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold transition-all duration-300 outline-none",
+          isMap ? "text-[11px]" : "text-[13px]",
           rentActive ? "text-white" : "text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70"
         )}
       >
         <HomeIcon
-          size={16}
+          size={isMap ? 14 : 16}
           className={cn(
             "transition-all duration-500",
             rentActive ? "scale-110" : "group-hover/rent:-translate-y-0.5"
@@ -47,7 +55,8 @@ export default function ModeToggle({ mode, onChange }: ModeToggleProps) {
       <button
         onClick={() => onChange('travelers')}
         className={cn(
-          "group/stays relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold text-[13px] transition-all duration-300 outline-none",
+          "group/stays relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold transition-all duration-300 outline-none",
+          isMap ? "text-[11px]" : "text-[13px]",
           travelActive ? "text-white" : "text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70"
         )}
       >
@@ -67,7 +76,7 @@ export default function ModeToggle({ mode, onChange }: ModeToggleProps) {
         </div>
 
         <Plane
-          size={16}
+          size={isMap ? 14 : 16}
           className={cn(
             "transition-all duration-500",
             travelActive ? "scale-110 rotate-[15deg]" : "group-hover/stays:-translate-y-0.5 rotate-[-5deg]"
@@ -80,9 +89,12 @@ export default function ModeToggle({ mode, onChange }: ModeToggleProps) {
       <div className={cn(
         "absolute -top-1 right-2 px-1.5 py-0.5 rounded-full border bg-white dark:bg-[#1A1A1E] shadow-[0_2px_10px_rgba(0,0,0,0.06)] transition-all duration-500 pointer-events-none z-[60]",
         "border-[#FF5211]",
-        travelActive ? "scale-100 -translate-y-0.5" : "scale-90"
+        travelActive ? (isMap ? "scale-85 -translate-y-0.5" : "scale-100 -translate-y-0.5") : "scale-0"
       )}>
-        <span className="text-[10px] font-black text-[#FF0000] tracking-[0.1em] leading-none block uppercase">Hotels</span>
+        <span className={cn(
+          "font-black text-[#FF0000] tracking-[0.1em] leading-none block uppercase",
+          isMap ? "text-[8px]" : "text-[10px]"
+        )}>Hotels</span>
       </div>
     </div>
   );

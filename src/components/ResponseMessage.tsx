@@ -1,15 +1,24 @@
 "use client";
 import { toast } from "sonner";
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
-  statusCode: number;
+  statusCode?: number;
   message: string;
-  data: T;
+  data?: T;
+  type?: 'success' | 'error' | 'info' | 'warning';
 }
 
 /** Show a toast based on the API response object */
-export const ResponseMessage = (res: ApiResponse) => {
+export const ResponseMessage = (res: ApiResponse<unknown>) => {
+  if (res.type) {
+    if (res.type === 'success') toast.success(res.message);
+    else if (res.type === 'error') toast.error(res.message);
+    else if (res.type === 'info') toast.info(res.message);
+    else if (res.type === 'warning') toast.warning(res.message);
+    return;
+  }
+
   if (res.success) {
     toast.success(res.message );
   } else {

@@ -4,13 +4,14 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { LogOut, Settings, User } from 'lucide-react';
+import { User as UserType } from '@/lib/types';
 import LogoWordmark from './LogoWordmark';
 import ModeToggle, { AppMode } from './ModeToggle';
 
 export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen, openProfileMenu, closeProfileMenu, menuRef }: {
   mode: AppMode;
   setMode: (mode: AppMode) => void;
-  user: any;
+  user: UserType | null;
   logout: () => void;
   isProfileMenuOpen: boolean;
   openProfileMenu: () => void;

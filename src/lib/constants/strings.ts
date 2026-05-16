@@ -1,0 +1,40 @@
+export const UI_STRINGS = {
+  common: {
+    location: "Location",
+    cancel: "Cancel",
+  },
+  map: {
+    header: {
+      roomNearby: "room nearby",
+      roomsNearby: "rooms nearby",
+      list: "List View",
+      postRoom: "Post Room",
+    },
+    search: {
+      enterLocation: "Where are you looking?",
+      placeholder: "Search area, city or landmark...",
+      noResults: "No locations found. Try a different search.",
+      searchBtn: "Search Area",
+      useCurrentLocation: "Use Current Location",
+      selectFromMap: "Select from Map",
+    },
+    roomsList: {
+      listedStays: "Listed Stays",
+      listedRooms: "Listed Rooms",
+      stays: "stays",
+      rooms: "rooms",
+      nearCenter: "near center",
+      showing: "Showing",
+      totalIndexed: "total indexed",
+      hiddenMissingCoords: "hidden due to missing coordinates",
+      noRoomsFound: "No Rooms Found",
+      tryExpanding: "Try expanding your search radius to find more results.",
+      adjustRadius: "Adjust Radius",
+      viewTrending: "View Trending",
+      day: "day",
+      month: "month",
+      traveler: "Traveler Friendly",
+      postYourRoomFree: "Post Your Room — It's Free",
+    },
+  },
+};

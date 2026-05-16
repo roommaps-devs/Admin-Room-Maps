@@ -56,11 +56,11 @@ export default function NotFound() {
 
         {/* Message */}
         <h1 className="text-2xl md:text-3xl font-black text-[#0A0A0A] mb-3 tracking-tight">
-          This room doesn't exist
+          This room doesn&apos;t exist
         </h1>
         <p className="text-[#6B6B6B] font-medium text-base md:text-lg mb-10 leading-relaxed">
-          The page you're looking for has moved, or never existed.<br />
-          Let's get you back to finding your perfect room.
+          The page you&apos;re looking for has moved, or never existed.<br />
+          Let&apos;s get you back to finding your perfect room.
         </p>
 
         {/* CTA Buttons */}

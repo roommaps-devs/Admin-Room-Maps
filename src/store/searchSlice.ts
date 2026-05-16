@@ -1,8 +1,9 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { SearchSuggestion } from '@/lib/types';
 
 interface SearchState {
   searchQuery: string;
-  suggestions: any[];
+  suggestions: SearchSuggestion[];
   isSearching: boolean;
   showSuggestions: boolean;
 }
@@ -21,7 +22,7 @@ const searchSlice = createSlice({
     setSearchQuery: (state, action: PayloadAction<string>) => {
       state.searchQuery = action.payload;
     },
-    setSuggestions: (state, action: PayloadAction<any[]>) => {
+    setSuggestions: (state, action: PayloadAction<SearchSuggestion[]>) => {
       state.suggestions = action.payload;
     },
     setIsSearching: (state, action: PayloadAction<boolean>) => {
