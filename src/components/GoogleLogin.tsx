@@ -73,7 +73,7 @@ import { setCookie } from "cookies-next";
 import { useDispatch } from "react-redux";
 import { setUser } from "@/store/userSlice";
 import { postRequest } from "@/lib/apiCall";
-import { ResponseMessage, catchResponseMessage } from "@/components/ResponseMessage";
+import { ResponseMessage, catchResponseMessage, ApiResponse } from "@/components/ResponseMessage";
 import { useState } from "react";
 
 export default function GoogleLogin() {
@@ -110,7 +110,7 @@ export default function GoogleLogin() {
 
         // Verify token & set user
         if (accessToken) {
-          const verifyRes = await postRequest("/auth/verify", { accessToken });
+          const verifyRes = await postRequest<ApiResponse<any>>("/auth/verify", { accessToken });
           setCookie("drive_access_token", accessToken);
 
           if (verifyRes.success) {

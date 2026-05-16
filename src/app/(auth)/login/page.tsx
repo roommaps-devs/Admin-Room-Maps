@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  User, Mail, Lock, ArrowLeft, Eye, EyeOff,
+  User as UserIcon, Mail, Lock, ArrowLeft, Eye, EyeOff,
   Shield, Zap, Check, CheckCircle2, Loader2
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -44,7 +44,7 @@ type AuthSchema = {
 
 type Tab = "login" | "signup";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useDispatch();
@@ -88,7 +88,7 @@ export default function LoginPage() {
   const verifyToken = async (token: string, userData?: any) => {
     if (token) {
       try {
-        const res = await postRequest("/auth/verify", { accessToken: token });
+        const res = await postRequest<ApiResponse<any>>("/auth/verify", { accessToken: token });
         setCookie("drive_access_token", token);
         if (res.success) {
           dispatch(setUser(res.data?.user || res.data || userData));
@@ -106,7 +106,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (tab === "login") {
-        const res = await postRequest<ApiResponse>("/auth/login", {
+        const res = await postRequest<ApiResponse<any>>("/auth/login", {
           email: data.email,
           password: data.password,
         });
@@ -115,7 +115,7 @@ export default function LoginPage() {
           await verifyToken(res.data.accessToken, res.data.user || res.data);
         }
       } else {
-        const res = await postRequest<ApiResponse>("/auth/register", {
+        const res = await postRequest<ApiResponse<any>>("/auth/register", {
           name: data.name,
           email: data.email,
           password: data.password,
@@ -177,7 +177,7 @@ export default function LoginPage() {
             {tab === 'signup' && (
               <div className="flex flex-col gap-1.5">
                 <div className="relative group">
-                  <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
+                  <UserIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
                   <Input
                     {...register("name")}
                     placeholder="Full name"
@@ -298,5 +298,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen w-full flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin text-brand-primary" size={40} />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
