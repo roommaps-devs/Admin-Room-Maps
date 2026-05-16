@@ -1,184 +1,302 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { User, Mail, Lock, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import {
+  User, Mail, Lock, ArrowLeft, Eye, EyeOff,
+  Shield, Zap, Check, CheckCircle2, Loader2
+} from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import z from "zod";
+import { useDispatch } from "react-redux";
+import { setCookie } from "cookies-next";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { postRequest } from "@/lib/apiCall";
-import { useForm } from "react-hook-form";
-import { zodResolver } from '@hookform/resolvers/zod';
-import z from "zod";
 import { ResponseMessage, catchResponseMessage, ApiResponse } from "@/components/ResponseMessage";
-import { setCookie } from "cookies-next";
-import { useDispatch } from "react-redux";
 import { setUser } from "@/store/userSlice";
 import GoogleLogin from "@/components/GoogleLogin";
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Email is required"),
+  email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
-type LoginSchema = z.infer<typeof loginSchema>;
+const signupSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string().min(1, "Please confirm your password"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
 
-
-export default function Login() {
-  const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-
-  const [loading, setLoading] = useState(false);
-
- const {register,handleSubmit,formState:{errors}} = useForm<LoginSchema>({
-  resolver: zodResolver(loginSchema),
-  defaultValues: {
-    email: "",
-    password: "",
-  },
- });
-
-
-
-  const dispatch = useDispatch();
-
-  const verifyToken = async (token: string, userData?: any) => {
-  if (token) {
-    const res = await postRequest("/auth/verify", {accessToken: token});
-     setCookie("drive_access_token", token);
-    if (res.success) {
-      dispatch(setUser(res.data?.user || res.data || userData));
-      router.push("/dashboard");
-    }else{
-      router.push("/login");
-    }
-  }
+type AuthSchema = {
+  name?: string;
+  email: string;
+  password: string;
+  confirmPassword?: string;
 };
 
+type Tab = "login" | "signup";
 
-  const onSubmit = async (data: LoginSchema) => {
+export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const dispatch = useDispatch();
+
+  const [tab, setTab] = useState<Tab>((searchParams.get("tab") as Tab) || "login");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<AuthSchema>({
+    resolver: zodResolver(tab === "login" ? loginSchema : signupSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab") as Tab;
+    if (tabParam && (tabParam === "login" || tabParam === "signup")) {
+      setTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab);
+    reset();
+    // Update URL without refresh
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", newTab);
+    window.history.pushState({}, "", url);
+  };
+
+  const verifyToken = async (token: string, userData?: any) => {
+    if (token) {
+      try {
+        const res = await postRequest("/auth/verify", { accessToken: token });
+        setCookie("drive_access_token", token);
+        if (res.success) {
+          dispatch(setUser(res.data?.user || res.data || userData));
+          router.push("/dashboard");
+        } else {
+          router.push("/login");
+        }
+      } catch (err) {
+        console.error("Token verification failed:", err);
+      }
+    }
+  };
+
+  const onSubmit = async (data: AuthSchema) => {
     setLoading(true);
     try {
-      const res = await postRequest<ApiResponse>("/auth/login", data);
-      ResponseMessage(res);
-      console.log(res ,  "rres") ;
-      const token = res.data?.accessToken;
-      if (res.success) {
-        verifyToken(token, res.data?.user || res.data);
+      if (tab === "login") {
+        const res = await postRequest<ApiResponse>("/auth/login", {
+          email: data.email,
+          password: data.password,
+        });
+        ResponseMessage(res);
+        if (res.success && res.data?.accessToken) {
+          await verifyToken(res.data.accessToken, res.data.user || res.data);
+        }
+      } else {
+        const res = await postRequest<ApiResponse>("/auth/register", {
+          name: data.name,
+          email: data.email,
+          password: data.password,
+        });
+        ResponseMessage(res);
+        if (res.success) {
+          handleTabChange("login");
+        }
       }
     } catch (err) {
       catchResponseMessage(err);
     } finally {
       setLoading(false);
     }
-
-
   };
-  
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-8 bg-black text-white relative">
-          {/* Back button */}
-          <button
-            onClick={() => router.back()}
-            className="absolute top-6 left-6 hover:bg-white/10 rounded-full p-2 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+    <div className="relative min-h-screen w-full bg-background flex items-center justify-center p-6 overflow-hidden">
 
-          <div className="text-center pt-4">
-            <h1 className="text-3xl font-bold mb-2">Login to your account</h1>
-            <p className="text-blue-100">
-              Access your files from anywhere
-            </p>
+      {/* Back Button */}
+      <Link
+        href="/"
+        className="absolute top-6 left-6 flex items-center gap-2 text-brand-text-primary/50 text-sm font-semibold px-4 py-2.5 bg-brand-surface backdrop-blur-md rounded-full border border-brand-glass-border transition-all hover:text-brand-text-primary hover:bg-brand-surface-elevated hover:-translate-x-1 z-10"
+      >
+        <ArrowLeft size={15} /> Home
+      </Link>
+
+      <div className="relative z-10 w-full max-w-[440px] animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="bg-brand-surface-elevated/60 backdrop-blur-[50px] border border-brand-glass-border rounded-[28px] p-8 shadow-[0_40px_120px_rgba(0,0,0,0.1)] flex flex-col gap-6">
+
+          {/* Header */}
+          <div className="flex flex-col items-center gap-1 text-center">
+            <h1 className="text-[26px] font-extrabold text-brand-text-primary tracking-tight leading-none">
+              Room<span className="text-brand-primary">Maps</span>
+            </h1>
+            <p className="text-brand-text-primary/35 text-[13px] font-medium">Find your perfect stay</p>
           </div>
-        </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-8 space-y-5">
-         
-
-          {/* Email */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-600 flex items-center">
-              <Mail className="w-4 h-4 mr-2 text-gray-400" />
-              Email Address
-            </label>
-            <div className="relative">
-              <Input
-                type="text"
-                placeholder="Enter your email"
-                className="pl-10 h-12"
-                {...register("email")}
-              />
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            </div>
-          </div>
-          
-
-          {/* Password */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-600 flex items-center">
-              <Lock className="w-4 h-4 mr-2 text-gray-400" />
-              Password
-            </label>
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                placeholder="At least 6 characters"
-                className="pl-10 pr-10 h-12"
-                {...register("password")}
-              />
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          {/* Tab Switcher */}
+          <div className="flex bg-brand-surface rounded-2xl p-1 gap-1 border border-black/5 dark:border-white/10">
+            {(["login", "signup"] as Tab[]).map((t) => (
               <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600"
+                key={t}
+                onClick={() => handleTabChange(t)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold capitalize transition-all duration-300 ${tab === t
+                  ? 'bg-brand-primary text-white shadow-[0_4px_20px_rgba(255,82,17,0.35)]'
+                  : 'text-brand-text-primary/40 hover:text-brand-text-primary/70'
+                  }`}
               >
-                {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
+                {t === 'login' ? 'Sign In' : 'Sign Up'}
               </button>
-            </div>
+            ))}
           </div>
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white hover:shadow-lg hover:shadow-blue-200 transition-all font-semibold text-base"
-          >
-            {loading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span className="ml-2">Login...</span>
-              </div>
-            ) : (
-              "Login"
-            )}
-          </Button>
-        </form>
+          {/* Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5">
 
-        {/* Footer */}
-        <div className="px-6 py-6 bg-gray-50 border-t">
-          <p className="text-center text-gray-600 text-sm">
-            Dont have an account? {" "}
-            <Link
-              href="/register"
-              className="text-blue-600 hover:text-blue-700 font-medium"
+            {/* Name - Signup Only */}
+            {tab === 'signup' && (
+              <div className="flex flex-col gap-1.5">
+                <div className="relative group">
+                  <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
+                  <Input
+                    {...register("name")}
+                    placeholder="Full name"
+                    className={`w-full bg-brand-surface border ${errors.name ? 'border-red-500/50' : 'border-black/10 dark:border-white/20'} rounded-2xl pl-11 pr-4 py-6 text-brand-text-primary text-sm placeholder:text-brand-text-primary/25 focus:outline-none focus:ring-0 focus:border-brand-primary/60 focus:bg-brand-surface-elevated transition-all`}
+                  />
+                </div>
+                {errors.name && <span className="text-[11px] text-red-500/80 ml-4">{errors.name.message}</span>}
+              </div>
+            )}
+
+            {/* Email */}
+            <div className="flex flex-col gap-1.5">
+              <div className="relative group">
+                <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
+                <Input
+                  {...register("email")}
+                  type="email"
+                  placeholder="Email address"
+                  className={`w-full bg-brand-surface border ${errors.email ? 'border-red-500/50' : 'border-black/10 dark:border-white/20'} rounded-2xl pl-11 pr-4 py-6 text-brand-text-primary text-sm placeholder:text-brand-text-primary/25 focus:outline-none focus:ring-0 focus:border-brand-primary/60 focus:bg-brand-surface-elevated transition-all`}
+                />
+              </div>
+              {errors.email && <span className="text-[11px] text-red-500/80 ml-4">{errors.email.message}</span>}
+            </div>
+
+            {/* Password */}
+            <div className="flex flex-col gap-1.5">
+              <div className="relative group">
+                <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
+                <Input
+                  {...register("password")}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Password"
+                  className={`w-full bg-brand-surface border ${errors.password ? 'border-red-500/50' : 'border-black/10 dark:border-white/20'} rounded-2xl pl-11 pr-12 py-6 text-brand-text-primary text-sm placeholder:text-brand-text-primary/25 focus:outline-none focus:ring-0 focus:border-brand-primary/60 focus:bg-brand-surface-elevated transition-all`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 hover:text-brand-primary transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.password && <span className="text-[11px] text-red-500/80 ml-4">{errors.password.message}</span>}
+
+              {tab === 'login' && (
+                <div className="flex justify-end pr-1">
+                  <Link href="/forgot-password" className="text-[11px] font-bold text-brand-primary hover:text-brand-primary/80 transition-colors">
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Confirm Password - Signup Only */}
+            {tab === 'signup' && (
+              <div className="flex flex-col gap-1.5">
+                <div className="relative group">
+                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
+                  <Input
+                    {...register("confirmPassword")}
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm password"
+                    className={`w-full bg-brand-surface border ${errors.confirmPassword ? 'border-red-500/50' : 'border-black/10 dark:border-white/20'} rounded-2xl pl-11 pr-12 py-6 text-brand-text-primary text-sm placeholder:text-brand-text-primary/25 focus:outline-none focus:ring-0 focus:border-brand-primary/60 focus:bg-brand-surface-elevated transition-all`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 hover:text-brand-primary transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <span className="text-[11px] text-red-500/80 ml-4">{errors.confirmPassword.message}</span>}
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-brand-primary text-white font-bold text-sm py-7 rounded-2xl transition-all duration-300 shadow-[0_8px_30px_rgba(255,82,17,0.35)] hover:shadow-[0_12px_40px_rgba(255,82,17,0.45)] hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed mt-2 border-none"
             >
-              Create Account
-            </Link>
-          </p>
-          <div className="flex justify-center py-5" ><GoogleLogin /></div>
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="animate-spin" size={18} />
+                  <span>{tab === 'signup' ? 'Creating account...' : 'Signing in...'}</span>
+                </div>
+              ) : (
+                tab === 'signup' ? 'Create Account' : 'Sign In'
+              )}
+            </Button>
+          </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-brand-glass-border" />
+            <span className="text-brand-text-primary/25 text-xs font-semibold uppercase tracking-widest">or</span>
+            <div className="flex-1 h-px bg-brand-glass-border" />
+          </div>
+
+          {/* Google Sign-in */}
+          <div className="w-full">
+            <GoogleLogin />
+          </div>
+
+          {/* Trust Pills */}
+          <div className="flex justify-center gap-3 pt-1">
+            {[
+              { icon: <Shield size={12} />, label: 'Secure Auth' },
+              { icon: <Zap size={12} />, label: 'Instant Access' },
+              { icon: <Check size={12} />, label: 'Free Forever' }
+            ].map(({ icon, label }) => (
+              <span key={label} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-text-primary/30">
+                <span className="text-brand-primary">{icon}</span>{label}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
-

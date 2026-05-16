@@ -134,35 +134,7 @@ export default function GoogleLogin() {
     <button
       onClick={loginWithGoogle}
       disabled={loading}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "12px",
-        width: "100%",
-        padding: "12px 24px",
-        backgroundColor: "#ffffff",
-        color: "#3c4043",
-        border: "1px solid #dadce0",
-        borderRadius: "8px",
-        fontSize: "15px",
-        fontWeight: 500,
-        fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
-        cursor: loading ? "not-allowed" : "pointer",
-        opacity: loading ? 0.7 : 1,
-        transition: "all 0.2s ease",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-      }}
-      onMouseEnter={(e) => {
-        if (!loading) {
-          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
-          e.currentTarget.style.backgroundColor = "#f8f9fa";
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.08)";
-        e.currentTarget.style.backgroundColor = "#ffffff";
-      }}
+      className="w-full bg-brand-surface text-brand-text-primary border border-black/10 dark:border-white/20 rounded-2xl py-3.5 text-sm font-bold flex items-center justify-center gap-3 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed hover:bg-brand-surface-elevated"
     >
       {loading ? (
         <svg
