@@ -1,16 +1,12 @@
 import { getCookie } from "cookies-next";
 
-const baseURL = process.env.NEXT_PUBLIC_BACKEND_URL!;
+const baseURL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
-export async function postRequest<T = any>(
+export async function postRequest<T = unknown>(
   endpoint: string,
-  data?: any
+  data?: unknown
 ): Promise<T> {
-
-
-  const token = getCookie("drive_clone");
-
-
+  const token = getCookie("roommaps_auth");
 
   const res = await fetch(`${baseURL}${endpoint}`, {
     method: "POST",
@@ -36,13 +32,10 @@ export async function postRequest<T = any>(
   return responseData;
 }
 
-
-export async function getRequest<T = any>(
+export async function getRequest<T = unknown>(
   endpoint: string,
 ): Promise<T> {
-
-
-  const token = getCookie("drive_clone");
+  const token = getCookie("roommaps_auth");
 
   const res = await fetch(`${baseURL}${endpoint}`, {
     method: "GET",

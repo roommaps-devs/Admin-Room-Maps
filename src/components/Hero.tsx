@@ -9,7 +9,8 @@ import ModeToggle from '@/components/ui/ModeToggle';
 import { RootState } from '@/store/store';
 import { useRouter } from 'next/navigation';
 import { setMode, setTravelersSheet } from '@/store/uiSlice';
-import { setSearchQuery, setShowSuggestions, setIsSearching } from '@/store/searchSlice';
+import { setSearchQuery, setShowSuggestions, setIsSearching, setSuggestions } from '@/store/searchSlice';
+import { SearchSuggestion } from '@/lib/types';
 
 export default function Hero() {
   const dispatch = useDispatch();
@@ -40,6 +41,32 @@ export default function Hero() {
     }, 3000);
     return () => clearInterval(timer);
   }, [locations.length]);
+
+  // Suggestion fetching logic
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 3) {
+      dispatch(setSuggestions([]));
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      dispatch(setIsSearching(true));
+      try {
+        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery + ', India')}&limit=5`);
+        const data = await res.json();
+        if (data && data.features) {
+          dispatch(setSuggestions(data.features));
+          dispatch(setShowSuggestions(true));
+        }
+      } catch (err) {
+        if (process.env.NODE_ENV !== "production") console.error(err);
+      } finally {
+        dispatch(setIsSearching(false));
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, dispatch]);
 
   const handleSearch = useCallback(() => {
     if (!searchQuery.trim()) return;
@@ -250,7 +277,6 @@ export default function Hero() {
               autoComplete="off"
               onChange={(e) => {
                 dispatch(setSearchQuery(e.target.value));
-                if (e.target.value.length < 3) dispatch(setShowSuggestions(false));
               }}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               onBlur={() => setTimeout(() => dispatch(setShowSuggestions(false)), 200)}
@@ -269,11 +295,11 @@ export default function Hero() {
           {/* Autocomplete - Floating style */}
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute top-[calc(100%+20px)] left-0 w-full bg-white border border-[#0A0A0A]/5 rounded-[32px] overflow-hidden z-[100] shadow-[0_40px_100px_rgba(0,0,0,0.1)] animate-in fade-in slide-in-from-top-4 duration-300">
-              {suggestions.map((feature: any, idx: number) => (
+              {suggestions.map((feature: SearchSuggestion, idx: number) => (
                 <div
                   key={idx}
                   className="flex items-center gap-5 px-8 py-5 cursor-pointer transition-all hover:bg-[#FAFAF8] group/item"
-                  onClick={() => { dispatch(setSearchQuery(feature.properties.name)); dispatch(setShowSuggestions(false)); handleSearch(); }}
+                  onClick={() => { dispatch(setSearchQuery(feature.properties.name || '')); dispatch(setShowSuggestions(false)); handleSearch(); }}
                 >
                   <div className="w-12 h-12 rounded-2xl bg-[#0A0A0A]/3 border border-[#0A0A0A]/5 flex items-center justify-center text-[#0A0A0A]/20 group-hover/item:text-[#FF5733] group-hover/item:scale-110 transition-all">
                     <MapPin size={20} />

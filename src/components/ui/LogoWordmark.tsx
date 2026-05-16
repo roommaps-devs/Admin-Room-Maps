@@ -1,7 +1,16 @@
+"use client";
+
 import React from 'react';
 import Link from 'next/link';
 
-export default function LogoWordmark({ variant = 'nav', themeColor = 'var(--primary)', href = '/', className = '' }: any) {
+interface LogoWordmarkProps {
+  variant?: 'nav' | 'footer';
+  themeColor?: string;
+  href?: string;
+  className?: string;
+}
+
+export default function LogoWordmark({ variant = 'nav', href = '/', className = '' }: LogoWordmarkProps) {
   const isNav = variant === 'nav';
 
   return (
@@ -11,7 +20,7 @@ export default function LogoWordmark({ variant = 'nav', themeColor = 'var(--prim
           <img src="/roommaps-logo.png" alt="Logo" className="w-full h-full object-contain" />
         </div>
         <div className={`flex flex-col items-start leading-none ${isNav ? 'gap-0' : 'gap-1'}`}>
-          <div className={`${isNav ? 'text-[24px]' : 'text-[25px]'} font-sans font-black tracking-tighter leading-none`}>
+          <div className={`${isNav ? 'text-[24px]' : 'text-[32px]'} font-sans font-black tracking-tighter leading-none`}>
             <span className="text-[#0f172a]">Room</span>
             <span className="text-[#ff5211]">Maps</span>
           </div>

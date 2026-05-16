@@ -1,0 +1,36 @@
+export interface Room {
+  id: string;
+  name: string;
+  city: string;
+  rent: number;
+  lat: number;
+  lng: number;
+  category: string;
+  type: string;
+  image?: string;
+  isTrending?: boolean;
+}
+
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  name?: string | null;
+  image?: string | null;
+}
+
+export interface SearchSuggestion {
+  properties: {
+    name?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    display_name?: string;
+    [key: string]: unknown;
+  };
+  geometry: {
+    type: string;
+    coordinates: [number, number];
+  };
+}
