@@ -9,6 +9,9 @@ export interface Room {
   type: string;
   image?: string;
   isTrending?: boolean;
+  location?: string;
+  isTravelerFriendly?: boolean;
+  rentType?: string;
 }
 
 export interface User {
