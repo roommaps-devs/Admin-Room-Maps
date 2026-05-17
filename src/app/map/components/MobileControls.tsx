@@ -59,7 +59,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   };
 
   return (
-    <div className="fixed bottom-[92px] left-0 right-0 z-[1001] px-4 pointer-events-none md:hidden flex flex-col items-center gap-3">
+    <div className="fixed bottom-[22px] left-0 right-0 z-[1001] px-4 pointer-events-none md:hidden flex flex-col items-center gap-3">
 
       {/* RANGE POPUP */}
       {showRadiusPopup && (

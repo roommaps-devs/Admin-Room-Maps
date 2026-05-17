@@ -37,7 +37,7 @@ const mapSlice = createSlice({
       state.searchCenter = action.payload;
     },
     setMapZoom: (state, action: PayloadAction<number>) => {
-      state.mapZoom = action.payload;
+      state.mapZoom = Math.max(5, Math.min(action.payload, 18));
     },
     setLiveUserPos: (state, action: PayloadAction<[number, number] | null>) => {
       state.liveUserPos = action.payload;

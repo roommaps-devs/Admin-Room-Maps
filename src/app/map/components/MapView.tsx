@@ -228,7 +228,7 @@ const MapView: React.FC<MapViewProps> = (props) => {
 
   return (
     <div id="map" className="fixed inset-0 w-full h-full z-0 overflow-hidden bg-[var(--bg-color)]">
-      <MapContainer center={searchCenter as L.LatLngExpression} zoom={mapZoom} maxZoom={18} zoomControl={false} attributionControl={false} style={{ width: '100%', height: '100%' }}>
+      <MapContainer center={searchCenter as L.LatLngExpression} zoom={mapZoom} minZoom={5} maxZoom={18} zoomControl={false} attributionControl={false} style={{ width: '100%', height: '100%' }}>
         <MapEvents
           onLocationSelect={isSelectingLocation ? (lat, lng) => setMapCenter([lat, lng]) : undefined}
           onMapMove={(lat, lng) => {
@@ -243,6 +243,7 @@ const MapView: React.FC<MapViewProps> = (props) => {
           key={currentTile.id}
           url={currentTile.url}
           subdomains={currentTile.subdomains || 'abcd'}
+          noWrap={true}
         />
 
         <MapMarkers
@@ -331,7 +332,7 @@ function CenteredControls({
         {/* Layer icon — bottom-left */}
         <div
           className="leaflet-top leaflet-left"
-          style={{ top: 'auto', bottom: 145, left: 12, right: 'auto', transform: 'none', pointerEvents: 'auto' }}
+          style={{ top: 'auto', bottom: 84, left: 12, right: 'auto', transform: 'none', pointerEvents: 'auto' }}
         >
           <div className="leaflet-control" style={{ margin: 0, border: 'none', background: 'transparent' }}>
             {layerButton}
@@ -341,7 +342,7 @@ function CenteredControls({
         {/* Zoom +/- — bottom-right */}
         <div
           className="leaflet-top leaflet-left"
-          style={{ top: 'auto', bottom: 150, right: 12, left: 'auto', transform: 'none', pointerEvents: 'auto' }}
+          style={{ top: 'auto', bottom: 84, right: 12, left: 'auto', transform: 'none', pointerEvents: 'auto' }}
         >
           <div className="leaflet-control" style={{ margin: 0, border: 'none', background: 'transparent' }}>
             <ZoomButtons />
