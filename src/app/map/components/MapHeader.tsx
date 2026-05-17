@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, MapPin, ArrowLeft, List as ListIcon,
-  PlusCircle, Search,
+  PlusCircle, Search, ChevronDown,
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 
@@ -45,6 +45,7 @@ export default function MapHeader({
 }: MapHeaderProps) {
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
+  const [isPriceFilterOpen, setIsPriceFilterOpen] = React.useState(false);
 
   const {
     searchQuery,
@@ -103,6 +104,18 @@ export default function MapHeader({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  const isAnyPrice = priceRange[0] === 0 && priceRange[1] >= 1000000;
+
+  const getPriceLabel = () => {
+    if (isAnyPrice) return "Price";
+    const format = (val: number) => {
+      if (val >= 1000000) return "∞";
+      if (val >= 1000) return `₹${(val / 1000).toFixed(0)}k`;
+      return `₹${val}`;
+    };
+    return `${format(priceRange[0])}-${format(priceRange[1])}`;
+  };
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[1001] pointer-events-none">
@@ -291,24 +304,39 @@ export default function MapHeader({
             </div>
           </div>
 
-          {/* Row 2: Mode Toggle */}
-          <ModeToggle
-            variant="map"
-            mode={mode}
-            onChange={(m) => dispatch(setMode(m as 'rent' | 'travelers'))}
-            className="mx-auto w-full"
-          />
+          {/* Row 2: Controls (Mode Toggle + Price Pill) */}
+          <div className="flex items-center gap-2 w-full">
+            <ModeToggle
+              variant="map"
+              mode={mode}
+              onChange={(m) => dispatch(setMode(m as 'rent' | 'travelers'))}
+              className="w-[185px] shrink-0 bg-black/[0.04] border-black/[0.06] shadow-none"
+            />
+            <button
+              onClick={() => setIsPriceFilterOpen(!isPriceFilterOpen)}
+              className={`flex-1 flex items-center justify-center gap-1.5 h-[36px] rounded-full border text-[11px] font-black uppercase tracking-wider transition-all duration-300 active:scale-95 ${
+                isPriceFilterOpen || !isAnyPrice
+                  ? 'bg-[#FF5211] text-white border-[#FF5211] shadow-[0_4px_12px_rgba(255,82,17,0.3)]'
+                  : 'bg-black/[0.04] text-black/60 border-black/[0.06] hover:bg-black/[0.08]'
+              }`}
+            >
+              <span>{getPriceLabel()}</span>
+              <ChevronDown size={12} className={`transition-transform duration-300 ${isPriceFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
 
-          {/* Row 3: Price Filter */}
-          {!isSelectingLocation && !isPostingRoom && (
-            <PriceFilter variant="mobile" />
+          {/* Row 3: Collapsible Price Filter */}
+          {isPriceFilterOpen && !isSelectingLocation && !isPostingRoom && (
+            <div className="mt-1 animate-in fade-in slide-in-from-top-3 duration-300">
+              <PriceFilter variant="mobile" />
+            </div>
           )}
         </div>
       </div>
 
       {/* NO RESULTS BANNER — hidden while user is selecting location or posting */}
       {!loading && visibleRoomsCount === 0 && !isSelectingLocation && !isPostingRoom && (
-        <div className="flex justify-center mt-2 px-4 pointer-events-auto">
+        <div className="flex justify-center px-4 pointer-events-auto">
           <div
             className="flex items-center gap-3 px-5 py-2.5 rounded-full animate-in fade-in slide-in-from-top-4 duration-500 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-black/10"
             style={{
@@ -316,7 +344,7 @@ export default function MapHeader({
               backdropFilter: 'blur(24px)',
             }}
           >
-            <div className="w-6 h-6 rounded-full bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
+            <div className="w-5 h-3 rounded-full bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
               <AlertCircle size={13} className="text-[var(--primary)]" strokeWidth={2.5} />
             </div>
             <p className="text-[12px] text-black/60 font-bold tracking-tight">

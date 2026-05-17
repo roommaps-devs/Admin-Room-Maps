@@ -213,7 +213,7 @@ export default function Footer() {
         </div>
 
         {/* ── Bottom bar ── */}
-        <div className="border-t border-white/[0.06] py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="border-t border-white/[0.06] pt-5 pb-24 md:pb-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-white/20 text-[11.5px] tracking-wide">
             © {year} RoomMaps Technologies. All rights reserved.
           </p>
