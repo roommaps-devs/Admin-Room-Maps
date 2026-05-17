@@ -12,6 +12,7 @@ interface MapState {
   showRadiusPopup: boolean;
   priceRange: [number, number];
   showProfileMenu: boolean;
+  activeTile: string;
 }
 
 const initialState: MapState = {
@@ -25,6 +26,7 @@ const initialState: MapState = {
   showRadiusPopup: false,
   priceRange: [0, 1000000],
   showProfileMenu: false,
+  activeTile: 'voyager',
 };
 
 const mapSlice = createSlice({
@@ -61,6 +63,9 @@ const mapSlice = createSlice({
     setShowProfileMenu: (state, action: PayloadAction<boolean>) => {
       state.showProfileMenu = action.payload;
     },
+    setActiveTile: (state, action: PayloadAction<string>) => {
+      state.activeTile = action.payload;
+    },
   },
 });
 
@@ -75,6 +80,7 @@ export const {
   setShowRadiusPopup,
   setPriceRange,
   setShowProfileMenu,
+  setActiveTile,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;

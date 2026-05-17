@@ -2,9 +2,8 @@
 
 import React from 'react';
 import { Compass, Crosshair, MapPin } from 'lucide-react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '@/store/store';
-import { setLiveUserPos, setSearchCenter } from '@/store/mapSlice';
+import { useDispatch } from 'react-redux';
+import { setLiveUserPos, setSearchCenter, setMapZoom } from '@/store/mapSlice';
 import { ResponseMessage } from '@/components/ResponseMessage';
 
 interface MobileControlsProps {
@@ -61,7 +60,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
 
   return (
     <div className="fixed bottom-[92px] left-0 right-0 z-[1001] px-4 pointer-events-none md:hidden flex flex-col items-center gap-3">
-      
+
       {/* RANGE POPUP */}
       {showRadiusPopup && (
         <div
@@ -91,20 +90,20 @@ const MobileControls: React.FC<MobileControlsProps> = ({
       )}
 
       {/* COMPACT UNIFIED COMMAND BAR */}
-      <div 
-        className="flex items-center h-14 rounded-[28px] pointer-events-auto shadow-2xl px-1 overflow-hidden w-full max-w-[340px]"
-        style={{ 
-          background: 'var(--bg-surface-elevated)', 
-          backdropFilter: 'blur(32px)', 
+      <div
+        className="flex items-center h-12 rounded-[28px] pointer-events-auto shadow-2xl px-1 overflow-hidden w-full max-w-[300px]"
+        style={{
+          background: 'var(--bg-surface-elevated)',
+          backdropFilter: 'blur(32px)',
           border: '1px solid var(--glass-border)',
         }}
       >
         {/* LOCATE */}
         <button
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full text-[var(--text-primary)]/60 active:scale-95 transition-all"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full text-[var(--text-primary)]/60 active:scale-95 transition-all cursor-pointer"
           onClick={handleLocateMe}
         >
-          <Crosshair size={16} className="opacity-70" />
+          <Crosshair size={12} className="opacity-70" />
           <span className="text-[9px] font-black uppercase tracking-widest">Locate</span>
         </button>
 
@@ -112,26 +111,26 @@ const MobileControls: React.FC<MobileControlsProps> = ({
 
         {/* RADIUS - Central prominent button */}
         <button
-          className={`flex-[1.5] flex flex-col items-center justify-center gap-0.5 h-full transition-all active:scale-95 ${showRadiusPopup ? 'text-[var(--primary)]' : 'text-[var(--text-primary)]'}`}
+          className={`flex-[1.5] flex flex-col items-center justify-center gap-0.5 h-full transition-all active:scale-95 cursor-pointer ${showRadiusPopup ? 'text-[var(--primary)]' : 'text-[var(--text-primary)]'}`}
           onClick={() => { setShowRadiusPopup(!showRadiusPopup); playClickSound(); }}
         >
           <div className="flex items-center gap-1.5">
-            <Compass size={18} className={showRadiusPopup ? 'animate-spin-slow' : 'text-[var(--primary)]'} />
-            <span className="text-[15px] font-black">
+            <Compass size={16} className={showRadiusPopup ? 'animate-spin-slow text-[var(--primary)]' : 'text-[var(--primary)]'} />
+            <span className="text-[13px] font-black">
               {searchRadius >= 1000 ? `${searchRadius / 1000}km` : `${searchRadius}m`}
             </span>
           </div>
-          <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-30">Range</span>
+          <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-35">Range</span>
         </button>
 
         <div className="w-px h-6 bg-[var(--glass-border)] opacity-30" />
 
         {/* PICK SPOT */}
         <button
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full text-[var(--text-primary)]/60 active:scale-95 transition-all"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full text-[var(--text-primary)]/60 active:scale-95 transition-all cursor-pointer"
           onClick={() => { onPickLocation(); playClickSound(); }}
         >
-          <MapPin size={16} className="opacity-70" />
+          <MapPin size={12} className="opacity-70" />
           <span className="text-[9px] font-black uppercase tracking-widest">Pick</span>
         </button>
       </div>

@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 import StoreProvider from "@/store/StoreProvider";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNav from "@/components/BottomNav";
 
 export default function RootLayout({
   children,
@@ -38,6 +39,7 @@ export default function RootLayout({
           <Header />
           <main className="flex-1">{children}</main>
           <Footer />
+          <BottomNav />
           <Toaster />
         </StoreProvider>
         <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />

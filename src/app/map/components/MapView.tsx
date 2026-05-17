@@ -6,6 +6,9 @@ import L from 'leaflet';
 import { useMap, useMapEvents } from 'react-leaflet';
 import MapMarkers from './MapMarkers';
 import { Layers, Plus, Minus } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '@/store/store';
+import { setActiveTile } from '@/store/mapSlice';
 
 // Dynamically import Leaflet components to avoid SSR issues
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
@@ -165,7 +168,9 @@ const MapView: React.FC<MapViewProps> = (props) => {
     formatRentCompact
   } = props;
 
-  const [activeTile, setActiveTile] = useState('voyager');
+  const dispatch = useDispatch();
+  const { activeTile } = useSelector((state: RootState) => state.map);
+  const handleSetActiveTile = (tileId: string) => dispatch(setActiveTile(tileId));
   const [showLayerMenu, setShowLayerMenu] = useState(false);
 
   const userIcon = L.divIcon({
@@ -260,7 +265,7 @@ const MapView: React.FC<MapViewProps> = (props) => {
           activeTile={activeTile}
           showLayerMenu={showLayerMenu}
           setShowLayerMenu={setShowLayerMenu}
-          setActiveTile={setActiveTile}
+          setActiveTile={handleSetActiveTile}
         />
       </MapContainer>
     </div>
@@ -326,7 +331,7 @@ function CenteredControls({
         {/* Layer icon — bottom-left */}
         <div
           className="leaflet-top leaflet-left"
-          style={{ top: 'auto', bottom: 148, left: 12, right: 'auto', transform: 'none', pointerEvents: 'auto' }}
+          style={{ top: 'auto', bottom: 145, left: 12, right: 'auto', transform: 'none', pointerEvents: 'auto' }}
         >
           <div className="leaflet-control" style={{ margin: 0, border: 'none', background: 'transparent' }}>
             {layerButton}
@@ -336,7 +341,7 @@ function CenteredControls({
         {/* Zoom +/- — bottom-right */}
         <div
           className="leaflet-top leaflet-left"
-          style={{ top: 'auto', bottom: 148, right: 12, left: 'auto', transform: 'none', pointerEvents: 'auto' }}
+          style={{ top: 'auto', bottom: 150, right: 12, left: 'auto', transform: 'none', pointerEvents: 'auto' }}
         >
           <div className="leaflet-control" style={{ margin: 0, border: 'none', background: 'transparent' }}>
             <ZoomButtons />
