@@ -66,11 +66,10 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
                 >
                   <span className="hidden sm:inline text-[14px] font-bold text-[var(--text-primary)] tracking-tight whitespace-nowrap">{user.name || user.displayName}</span>
                   <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-md">
-                    <Image
-                      src={user.image || user.photoURL || `https://ui-avatars.com/api/?name=${user.name || user.displayName}`}
+                    <img
+                      src={user.image || user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.displayName || 'User')}`}
                       alt="Profile"
-                      fill
-                      className="object-cover"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 </div>
@@ -79,11 +78,10 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
                   <div className="absolute top-[135%] right-0 sm:right-0 bg-[var(--bg-surface-elevated)]/98 backdrop-blur-[32px] border border-[var(--glass-border)] shadow-[0_40px_80px_rgba(0,0,0,0.18)] rounded-[32px] p-2.5 min-w-[260px] z-50 animate-in fade-in zoom-in-95 duration-300 origin-top-right">
                     <div className="flex items-center gap-3.5 p-4 mb-2.5 bg-[var(--bg-surface)]/80 rounded-[24px] text-left border border-[var(--glass-border)]">
                       <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md shrink-0">
-                        <Image
-                          src={user.image || user.photoURL || `https://ui-avatars.com/api/?name=${user.name || user.displayName}`}
+                        <img
+                          src={user.image || user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.displayName || 'User')}`}
                           alt="Profile"
-                          fill
-                          className="object-cover"
+                          className="w-full h-full object-cover"
                         />
                       </div>
                       <div className="flex flex-col gap-0.5 min-w-0">
