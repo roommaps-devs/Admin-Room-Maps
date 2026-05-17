@@ -52,7 +52,7 @@ export default function Hero() {
     const delayDebounceFn = setTimeout(async () => {
       dispatch(setIsSearching(true));
       try {
-        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery + ', India')}&limit=5`);
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(searchQuery)}`);
         const data = await res.json();
         if (data && data.features) {
           dispatch(setSuggestions(data.features));

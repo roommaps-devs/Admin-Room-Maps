@@ -82,7 +82,7 @@ export default function MapHeader({
 
   const handleCityClick = async (city: string) => {
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city + ', India')}`);
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(city)}&provider=nominatim`);
       const data = await res.json();
       if (data && data.length > 0) {
         const coords: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
@@ -109,7 +109,7 @@ export default function MapHeader({
       {!isMobile && (
         /* DESKTOP HEADER */
         <div
-          className="hidden md:flex items-center gap-3 px-5 h-16 pointer-events-auto border-b border-[var(--glass-border)]"
+          className="relative z-10 hidden md:flex items-center gap-3 px-5 h-16 pointer-events-auto border-b border-[var(--glass-border)]"
           style={{
             background: 'var(--glass-bg)',
             backdropFilter: 'blur(24px)',
@@ -266,26 +266,26 @@ export default function MapHeader({
         className="md:hidden p-3 pointer-events-none flex flex-col gap-2 pt-[max(env(safe-area-inset-top),16px)]"
       >
         <div 
-          className="flex flex-col gap-2 p-3 rounded-[32px] pointer-events-auto border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.15)] overflow-hidden"
+          className="flex flex-col gap-2 p-3 rounded-[32px] pointer-events-auto border border-black/10 shadow-[0_8px_32px_rgba(0,0,0,0.15)] overflow-hidden"
           style={{ 
-            background: 'rgba(var(--bg-surface-rgb), 0.65)', 
+            background: 'rgba(255, 255, 255, 0.96)', 
             backdropFilter: 'blur(32px) saturate(180%)',
           }}
         >
-          {/* Row 1: Back + Search + Pin */}
+          {/* Row 1: Back + Search */}
           <div className="flex items-center gap-2">
             <Link
               href="/"
-              className="shrink-0 w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--text-primary)]/40 active:scale-90 transition-transform"
+              className="shrink-0 w-10 h-10 rounded-2xl bg-black/[0.04] border border-black/[0.06] flex items-center justify-center text-black/40 active:scale-90 transition-transform"
             >
               <ArrowLeft size={18} />
             </Link>
             <div
-              className="flex-1 flex items-center bg-white/5 border border-white/10 h-10 rounded-2xl px-4 gap-2 cursor-pointer active:scale-[0.98] transition-transform"
+              className="flex-1 flex items-center bg-black/[0.04] border border-black/[0.06] h-10 rounded-2xl px-4 gap-2 cursor-pointer active:scale-[0.98] transition-transform"
               onClick={onOpenSearch}
             >
-              <Search size={15} className="text-[var(--text-primary)]/30 shrink-0" />
-              <span className={`text-[13px] font-semibold truncate flex-1 ${searchQuery ? 'text-[var(--text-primary)]/90' : 'text-[var(--text-primary)]/40'}`}>
+              <Search size={15} className="text-black/30 shrink-0" />
+              <span className={`text-[13px] font-semibold truncate flex-1 ${searchQuery ? 'text-black/80' : 'text-black/40'}`}>
                 {searchQuery || 'Search area or city...'}
               </span>
             </div>
@@ -296,7 +296,7 @@ export default function MapHeader({
             variant="map"
             mode={mode}
             onChange={(m) => dispatch(setMode(m as 'rent' | 'travelers'))}
-            className="w-full"
+            className="mx-auto w-full"
           />
 
           {/* Row 3: Price Filter */}
@@ -310,28 +310,47 @@ export default function MapHeader({
       {!loading && visibleRoomsCount === 0 && !isSelectingLocation && !isPostingRoom && (
         <div className="flex justify-center mt-2 px-4 pointer-events-auto">
           <div
-            className="flex items-center gap-3 px-5 py-2.5 rounded-full animate-in fade-in slide-in-from-top-4 duration-500 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white/10"
+            className="flex items-center gap-3 px-5 py-2.5 rounded-full animate-in fade-in slide-in-from-top-4 duration-500 shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-black/10"
             style={{
-              background: 'rgba(var(--bg-surface-rgb), 0.7)',
+              background: 'rgba(255, 255, 255, 0.96)',
               backdropFilter: 'blur(24px)',
             }}
           >
-            <div className="w-6 h-6 rounded-full bg-[var(--primary)]/15 flex items-center justify-center shrink-0">
+            <div className="w-6 h-6 rounded-full bg-[var(--primary)]/10 flex items-center justify-center shrink-0">
               <AlertCircle size={13} className="text-[var(--primary)]" strokeWidth={2.5} />
             </div>
-            <p className="text-[12px] text-[var(--text-primary)]/60 font-bold tracking-tight">
+            <p className="text-[12px] text-black/60 font-bold tracking-tight">
               No rooms in{' '}
-              <span className="text-[var(--text-primary)]/90 font-black">
+              <span className="text-black font-black">
                 {searchRadius >= 1000 ? `${searchRadius / 1000}km` : `${searchRadius}m`}
               </span>{' '}
               range
             </p>
-            <button
-              className="text-[10px] font-black uppercase tracking-widest text-[var(--primary)] hover:opacity-80 transition-all pl-3 border-l border-white/10 active:scale-95"
-              onClick={() => dispatch(setShowRadiusPopup(true))}
-            >
-              Expand
-            </button>
+            {searchRadius < 10000 && (
+              <button
+                className="text-[10px] font-black uppercase tracking-widest text-[var(--primary)] hover:opacity-80 transition-all pl-3 border-l border-black/10 active:scale-95"
+                onClick={() => {
+                  if (isMobile) {
+                    dispatch(setShowRadiusPopup(true));
+                  } else {
+                    // Programmatically expand the radius to the next level on desktop
+                    let nextRadius = searchRadius;
+                    if (searchRadius === 500) nextRadius = 1000;
+                    else if (searchRadius === 1000) nextRadius = 5000;
+                    else if (searchRadius === 5000) nextRadius = 10000;
+                    else return; // already at max radius
+                    
+                    dispatch(setSearchRadius(nextRadius));
+                    if (nextRadius === 500) dispatch(setMapZoom(16));
+                    else if (nextRadius === 1000) dispatch(setMapZoom(15));
+                    else if (nextRadius === 5000) dispatch(setMapZoom(13));
+                    else if (nextRadius === 10000) dispatch(setMapZoom(12));
+                  }
+                }}
+              >
+                Expand
+              </button>
+            )}
           </div>
         </div>
       )}

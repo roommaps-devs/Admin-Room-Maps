@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useCallback } from 'react';
 import { Home as HomeIcon, Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import StaysModeSheet from './StaysModeSheet';
 
 export type AppMode = 'rent' | 'travelers';
 
@@ -17,85 +19,122 @@ export default function ModeToggle({ mode, onChange, variant = 'default', classN
   const rentActive = mode === 'rent';
   const travelActive = mode === 'travelers';
 
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [pendingMode, setPendingMode] = useState<AppMode | null>(null);
+
+  const handleModeClick = useCallback((targetMode: AppMode) => {
+    // If already on this mode, do nothing
+    if (targetMode === mode) return;
+
+    // On mobile (touch) devices, show the confirmation sheet
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setPendingMode(targetMode);
+      setSheetOpen(true);
+    } else {
+      // On desktop, switch immediately
+      onChange(targetMode);
+    }
+  }, [mode, onChange]);
+
+  const handleConfirm = useCallback(() => {
+    if (pendingMode) onChange(pendingMode);
+    setSheetOpen(false);
+    setPendingMode(null);
+  }, [pendingMode, onChange]);
+
+  const handleCancel = useCallback(() => {
+    setSheetOpen(false);
+    setPendingMode(null);
+  }, []);
+
   return (
-    <div className={cn(
-      "relative flex items-center p-1 rounded-full bg-[var(--bg-surface)] border border-[var(--glass-border)] w-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]",
-      isMap ? "h-[36px] max-w-[220px]" : "h-[42px] max-w-[280px]",
-      className
-    )}>
-      {/* Selection Slider with Glow */}
-      <div
-        className={cn(
-          "absolute h-[calc(100%-8px)] rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] z-[1]",
-          "bg-gradient-to-br from-[#FF6B35] via-[#FF5211] to-[#E84300]",
-          "shadow-[0_4px_12px_rgba(255,82,17,0.35)]",
-          travelActive ? 'translate-x-full' : 'translate-x-0'
-        )}
-        style={{ width: 'calc(50% - 4px)', left: '4px' }}
-      />
-
-      <button
-        onClick={() => onChange('rent')}
-        className={cn(
-          "group/rent relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold transition-all duration-300 outline-none",
-          isMap ? "text-[11px]" : "text-[13px]",
-          rentActive ? "text-white" : "text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70"
-        )}
-      >
-        <HomeIcon
-          size={isMap ? 14 : 16}
+    <>
+      <div className={cn(
+        "relative flex items-center p-1 rounded-full bg-[var(--bg-surface)] border border-[var(--glass-border)] w-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]",
+        isMap ? "h-[36px] max-w-[220px]" : "h-[42px] max-w-[280px]",
+        className
+      )}>
+        {/* Selection Slider with Glow */}
+        <div
           className={cn(
-            "transition-all duration-500",
-            rentActive ? "scale-110" : "group-hover/rent:-translate-y-0.5"
+            "absolute h-[calc(100%-8px)] rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] z-[1]",
+            "bg-gradient-to-br from-[#FF6B35] via-[#FF5211] to-[#E84300]",
+            "shadow-[0_4px_12px_rgba(255,82,17,0.35)]",
+            travelActive ? 'translate-x-full' : 'translate-x-0'
           )}
+          style={{ width: 'calc(50% - 4px)', left: '4px' }}
         />
-        <span className="tracking-tight">For Rent</span>
-      </button>
 
-      <button
-        onClick={() => onChange('travelers')}
-        className={cn(
-          "group/stays relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold transition-all duration-300 outline-none",
-          isMap ? "text-[11px]" : "text-[13px]",
-          travelActive ? "text-white" : "text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70"
-        )}
-      >
-        {/* Info Popover */}
-        <div className="absolute top-[120%] left-1/2 -translate-x-1/2 w-[240px] opacity-0 translate-y-2 group-hover/stays:opacity-100 group-hover/stays:translate-y-0 transition-all duration-500 pointer-events-none z-[50]">
-          <div className="relative bg-white dark:bg-[#1A1A1E] p-5 rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-[var(--glass-border)] text-left">
-            {/* Arrow */}
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-[#1A1A1E] border-t border-l border-[var(--glass-border)] rotate-45" />
+        <button
+          onClick={() => handleModeClick('rent')}
+          className={cn(
+            "group/rent relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold transition-all duration-300 outline-none",
+            isMap ? "text-[11px]" : "text-[13px]",
+            rentActive ? "text-white" : "text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70"
+          )}
+        >
+          <HomeIcon
+            size={isMap ? 14 : 16}
+            className={cn(
+              "transition-all duration-500",
+              rentActive ? "scale-110" : "group-hover/rent:-translate-y-0.5"
+            )}
+          />
+          <span className="tracking-tight">For Rent</span>
+        </button>
 
-            <div className="relative space-y-1.5">
-              <h4 className="text-[11px] font-black text-[#FF5211] tracking-[0.1em] uppercase">Short-term Stays</h4>
-              <p className="text-[13px] font-medium text-[var(--text-primary)]/70 leading-relaxed">
-                Daily rentals and short-term visits under 30 days.
-              </p>
+        <button
+          onClick={() => handleModeClick('travelers')}
+          className={cn(
+            "group/stays relative z-[2] w-1/2 h-full flex items-center justify-center gap-2.5 font-bold transition-all duration-300 outline-none",
+            isMap ? "text-[11px]" : "text-[13px]",
+            travelActive ? "text-white" : "text-[var(--text-primary)]/40 hover:text-[var(--text-primary)]/70"
+          )}
+        >
+          {/* Desktop hover tooltip (hidden on mobile) */}
+          <div className="hidden md:block absolute top-[120%] left-1/2 -translate-x-1/2 w-[240px] opacity-0 translate-y-2 group-hover/stays:opacity-100 group-hover/stays:translate-y-0 transition-all duration-500 pointer-events-none z-[50]">
+            <div className="relative bg-white dark:bg-[#1A1A1E] p-5 rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-[var(--glass-border)] text-left">
+              {/* Arrow */}
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-white dark:bg-[#1A1A1E] border-t border-l border-[var(--glass-border)] rotate-45" />
+              <div className="relative space-y-1.5">
+                <h4 className="text-[11px] font-black text-[#FF5211] tracking-[0.1em] uppercase">Short-term Stays</h4>
+                <p className="text-[13px] font-medium text-[var(--text-primary)]/70 leading-relaxed">
+                  Daily rentals and short-term visits under 30 days.
+                </p>
+              </div>
             </div>
           </div>
+
+          <Plane
+            size={isMap ? 14 : 16}
+            className={cn(
+              "transition-all duration-500",
+              travelActive ? "scale-110 rotate-[15deg]" : "group-hover/stays:-translate-y-0.5 rotate-[-5deg]"
+            )}
+          />
+          <span className="tracking-tight">Stays</span>
+        </button>
+
+        {/* HOTELS Badge - Always Visible */}
+        <div className={cn(
+          "absolute -top-1 right-2 px-1.5 py-0.5 rounded-full border bg-white dark:bg-[#1A1A1E] shadow-[0_2px_10px_rgba(0,0,0,0.06)] transition-all duration-500 pointer-events-none z-[60]",
+          "border-[#FF5211]",
+          isMap ? "scale-85 -translate-y-0.5" : "scale-100 -translate-y-0.5"
+        )}>
+          <span className={cn(
+            "font-black text-[#FF0000] tracking-[0.1em] leading-none block uppercase",
+            isMap ? "text-[8px]" : "text-[10px]"
+          )}>Hotels</span>
         </div>
-
-        <Plane
-          size={isMap ? 14 : 16}
-          className={cn(
-            "transition-all duration-500",
-            travelActive ? "scale-110 rotate-[15deg]" : "group-hover/stays:-translate-y-0.5 rotate-[-5deg]"
-          )}
-        />
-        <span className="tracking-tight">Stays</span>
-      </button>
-
-      {/* HOTEL Badge - Always Visible at the end */}
-      <div className={cn(
-        "absolute -top-1 right-2 px-1.5 py-0.5 rounded-full border bg-white dark:bg-[#1A1A1E] shadow-[0_2px_10px_rgba(0,0,0,0.06)] transition-all duration-500 pointer-events-none z-[60]",
-        "border-[#FF5211]",
-        travelActive ? (isMap ? "scale-85 -translate-y-0.5" : "scale-100 -translate-y-0.5") : "scale-0"
-      )}>
-        <span className={cn(
-          "font-black text-[#FF0000] tracking-[0.1em] leading-none block uppercase",
-          isMap ? "text-[8px]" : "text-[10px]"
-        )}>Hotels</span>
       </div>
-    </div>
+
+      {/* Mobile confirmation sheet */}
+      <StaysModeSheet
+        isOpen={sheetOpen}
+        currentMode={mode}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    </>
   );
 }
