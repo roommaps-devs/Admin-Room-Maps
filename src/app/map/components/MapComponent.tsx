@@ -167,7 +167,7 @@ export default function MapComponent({
     const delayDebounceFn = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(tempQuery + ', India')}&limit=5`);
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(tempQuery)}`);
         const data = await res.json();
         if (data && data.features) {
           setSuggestions(data.features);
@@ -185,7 +185,7 @@ export default function MapComponent({
   const handleSearch = useCallback(async () => {
     if (!tempQuery.trim()) return;
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(tempQuery + ', India')}`);
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(tempQuery)}&provider=nominatim`);
       const data = await res.json();
       if (data && data.length > 0) {
         const coords: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
@@ -416,7 +416,24 @@ export default function MapComponent({
         searchCenter={searchCenter}
         searchRadius={searchRadius}
         missingLocationCount={missingLocationCount}
-        setShowRadiusPopup={(show: boolean) => dispatch(setShowRadiusPopup(show))}
+        setShowRadiusPopup={(show: boolean) => {
+          if (show && typeof window !== 'undefined' && window.innerWidth >= 768) {
+            // Programmatically expand the radius to the next level on desktop
+            let nextRadius = searchRadius;
+            if (searchRadius === 500) nextRadius = 1000;
+            else if (searchRadius === 1000) nextRadius = 5000;
+            else if (searchRadius === 5000) nextRadius = 10000;
+            else return; // already at max radius
+            
+            dispatch(setSearchRadius(nextRadius));
+            if (nextRadius === 500) dispatch(setMapZoom(16));
+            else if (nextRadius === 1000) dispatch(setMapZoom(15));
+            else if (nextRadius === 5000) dispatch(setMapZoom(13));
+            else if (nextRadius === 10000) dispatch(setMapZoom(12));
+          } else {
+            dispatch(setShowRadiusPopup(show));
+          }
+        }}
         openBottomSheet={openBottomSheet}
         onPostRoom={handlePostRoom}
         formatRent={formatRent}

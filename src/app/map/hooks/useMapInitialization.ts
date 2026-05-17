@@ -119,9 +119,12 @@ export function useMapInitialization({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialId, initialRooms.length, dispatch]);
 
+  const nearbyInitializedRef = useRef(false);
+
   // Handle Automatic Geolocation for "Nearby" rooms
   useEffect(() => {
-    if (isNearby && navigator.geolocation) {
+    if (isNearby && navigator.geolocation && !nearbyInitializedRef.current) {
+      nearbyInitializedRef.current = true;
       ResponseMessage({ success: true, message: "Locating nearby rooms...", type: "info", data: null });
       navigator.geolocation.getCurrentPosition((pos) => {
         const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];

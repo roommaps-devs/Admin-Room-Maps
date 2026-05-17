@@ -66,7 +66,7 @@ const PriceFilter: React.FC<PriceFilterProps> = ({ variant = 'desktop' }) => {
         <div className="flex flex-col">
           {!compact && <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-primary)]/30 mb-1">Price Range</span>}
           <span className={`${compact ? 'text-[12px]' : 'text-[14px]'} font-black text-[var(--primary)]`}>
-            {compact && <span className="text-[10px] font-bold text-[var(--text-primary)]/40 mr-2 uppercase tracking-tighter">Price:</span>}
+            {compact && <span className={`text-[10px] font-bold mr-2 uppercase tracking-tighter ${compact ? 'text-black/50' : 'text-[var(--text-primary)]/40'}`}>Price:</span>}
             {formatValue(priceRange[0])} — {priceRange[1] >= maxLimit ? 'No Limit' : formatValue(priceRange[1])}
           </span>
         </div>
@@ -79,7 +79,7 @@ const PriceFilter: React.FC<PriceFilterProps> = ({ variant = 'desktop' }) => {
         minStepsBetweenThumbs={1}
         onValueChange={handleSliderChange}
       >
-        <Slider.Track className="bg-[var(--glass-border)] relative grow rounded-full h-[4px]">
+        <Slider.Track className={`relative grow rounded-full h-[4px] ${compact ? 'bg-black/[0.08]' : 'bg-[var(--glass-border)]'}`}>
           <Slider.Range className="absolute bg-[var(--primary)] rounded-full h-full transition-all duration-500 ease-out" />
         </Slider.Track>
         <Slider.Thumb
@@ -92,15 +92,15 @@ const PriceFilter: React.FC<PriceFilterProps> = ({ variant = 'desktop' }) => {
         />
       </Slider.Root>
       <div className="flex justify-between mt-3">
-        <span className="text-[10px] font-bold text-[var(--text-primary)]/20">₹0</span>
-        <span className="text-[10px] font-bold text-[var(--text-primary)]/20">{formatValue(maxLimit)}+</span>
+        <span className={`text-[10px] font-bold ${compact ? 'text-black/30' : 'text-[var(--text-primary)]/20'}`}>₹0</span>
+        <span className={`text-[10px] font-bold ${compact ? 'text-black/30' : 'text-[var(--text-primary)]/20'}`}>{formatValue(maxLimit)}+</span>
       </div>
     </div>
   );
 
   if (variant === 'mobile') {
     return (
-      <div className="w-full bg-white/5 rounded-2xl border border-white/10 animate-in fade-in slide-in-from-top-2 duration-500">
+      <div className="w-full bg-black/[0.03] rounded-2xl border border-black/[0.05] animate-in fade-in slide-in-from-top-2 duration-500">
         <SliderUI compact />
       </div>
     );
