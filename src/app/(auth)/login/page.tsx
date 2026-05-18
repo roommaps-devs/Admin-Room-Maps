@@ -89,7 +89,7 @@ function LoginContent() {
     if (token) {
       try {
         const res = await postRequest<ApiResponse<any>>("/auth/verify", { accessToken: token });
-        setCookie("drive_access_token", token);
+        setCookie("drive_access_token", token, { path: '/' });
         if (res.success) {
           dispatch(setUser(res.data?.user || res.data || userData));
           router.push("/dashboard");

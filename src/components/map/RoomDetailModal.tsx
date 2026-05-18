@@ -1,18 +1,33 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { MapPin, Phone, Check, Footprints, Home, X, Share2, Navigation, Heart, Flag, Loader2 } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Room } from '@/lib/types';
-import { getRequest, postRequest } from '@/lib/apiCall';
+import React, { useState, useEffect } from "react";
+import {
+  MapPin,
+  Phone,
+  Check,
+  Home,
+  X,
+  Share2,
+  Navigation,
+  Heart,
+  Flag,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Building2,
+} from "lucide-react";
+import Image from "next/image";
+import { Room } from "@/lib/types";
+import { getRequest, postRequest } from "@/lib/apiCall";
+import { resolveImageUrl } from "@/lib/hooks/useRooms";
 
 interface RoomDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   room: Room | null;
   searchCenter?: [number, number];
-  viewMode?: 'bottom-sheet' | 'centered';
+  similarRooms?: Room[];
 }
 
 interface ReportType {
@@ -20,82 +35,99 @@ interface ReportType {
   name: string;
 }
 
-// Utility to calculate real distance between coordinates
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371e3; // meters
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const R = 6371e3;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) ** 2 +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c; // in meters
+  return R * c;
 };
 
-export default function RoomDetailModal({ 
-  isOpen, 
-  onClose, 
-  room,
-  searchCenter
+export default function RoomDetailModal({
+  isOpen,
+  onClose,
+  room: initialRoom,
+  searchCenter,
+  similarRooms: externalSimilarRooms = [],
 }: RoomDetailModalProps) {
+  const [currentRoom, setCurrentRoom] = useState<Room | null>(initialRoom);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReasonId, setSelectedReasonId] = useState<string | null>(null);
   const [otherText, setOtherText] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
-
   const [reportTypes, setReportTypes] = useState<ReportType[]>([]);
   const [isLoadingTypes, setIsLoadingTypes] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageList, setImageList] = useState<string[]>([]);
+
+  useEffect(() => {
+    setCurrentRoom(initialRoom);
+  }, [initialRoom]);
+
+  useEffect(() => {
+    if (currentRoom) {
+      const images = currentRoom.images?.filter(Boolean) || (currentRoom.image ? [currentRoom.image] : []);
+      const resolved = images.map((img) => resolveImageUrl(img)).filter(Boolean);
+      setImageList(resolved);
+      setCurrentImageIndex(0);
+    }
+  }, [currentRoom]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
 
   const fetchReportTypes = async () => {
     setIsLoadingTypes(true);
     try {
-      const res = await getRequest<{ success: boolean; data: ReportType[] }>("/report/getAllReportTpyes");
-      if (res && res.success && Array.isArray(res.data)) {
-        setReportTypes(res.data);
-      }
+      const res = await getRequest<{ success: boolean; data: ReportType[] }>(
+        "/report/getAllReportTpyes"
+      );
+      if (res?.success && Array.isArray(res.data)) setReportTypes(res.data);
     } catch (error) {
-      console.error("Failed to fetch report types:", error);
+      console.error(error);
     } finally {
       setIsLoadingTypes(false);
     }
   };
 
   useEffect(() => {
-    if (showReportModal) {
-      fetchReportTypes();
-    }
+    if (showReportModal) fetchReportTypes();
   }, [showReportModal]);
 
   const handleSubmitReport = async () => {
-    if (!selectedReasonId || !room) return;
+    if (!selectedReasonId || !currentRoom) return;
     setIsSubmitting(true);
-    
     try {
-      const isOther = selectedReasonId === 'other';
-      const reasonName = isOther ? 'Other' : (reportTypes.find(t => t.id === selectedReasonId)?.name || '');
-      
-      const payload = {
-        reportTypeId: isOther ? undefined : selectedReasonId,
-        roomId: room.id,
+      const isOther = selectedReasonId === "other";
+      const reasonName = isOther
+        ? otherText
+        : reportTypes.find((t) => t.id === selectedReasonId)?.name || "";
+      await postRequest("/report/postReport/create", {
+        reportListId: isOther ? undefined : selectedReasonId,
+        postId: currentRoom.id,
         reason: reasonName,
-        description: isOther ? otherText : undefined
-      };
-      
-      await postRequest("/report/create", payload);
+      });
     } catch (error) {
-      console.warn("API report submission failed, falling back to client-side success:", error);
+      console.warn(error);
     } finally {
       setIsSubmitting(false);
       setReportSubmitted(true);
-      
-      // Soft auto-dismiss after 3.5 seconds
       setTimeout(() => {
         setShowReportModal(false);
         setSelectedReasonId(null);
@@ -105,205 +137,288 @@ export default function RoomDetailModal({
     }
   };
 
-  if (!isOpen || !room) return null;
+  const nextImage = () => {
+    if (imageList.length > 1) setCurrentImageIndex((prev) => (prev + 1) % imageList.length);
+  };
 
-  // Calculate dynamic walking distance
-  let distanceText = "200m away"; // Premium default
-  if (searchCenter && room.lat && room.lng) {
-    const meters = getDistance(room.lat, room.lng, searchCenter[0], searchCenter[1]);
-    if (meters < 1000) {
-      distanceText = `${Math.round(meters)}m away`;
-    } else {
-      distanceText = `${(meters / 1000).toFixed(1)}km away`;
-    }
-  } else {
-    // Generate a realistic mock distance between 100m and 800m
-    const mockDist = Math.floor(100 + (Math.abs(room.lat * 1000) % 700));
-    distanceText = `${mockDist}m away`;
+  const prevImage = () => {
+    if (imageList.length > 1)
+      setCurrentImageIndex((prev) => (prev - 1 + imageList.length) % imageList.length);
+  };
+
+  let distanceText = "31 min away";
+  if (searchCenter && currentRoom?.lat && currentRoom?.lng) {
+    const meters = getDistance(currentRoom.lat, currentRoom.lng, searchCenter[0], searchCenter[1]);
+    const minutes = Math.max(1, Math.round((meters / 80) * 1.2));
+    distanceText = minutes < 60 ? `${minutes} min away` : `${(meters / 1000).toFixed(1)} km away`;
   }
 
+  const recommendedList =
+    externalSimilarRooms.filter((r) => r.id !== currentRoom?.id) || [];
+
+  if (!isOpen || !currentRoom) return null;
+
   return (
-    <div 
-      className="fixed inset-0 z-[5000] flex flex-col items-center justify-end md:justify-center p-4 md:p-6 bg-black/35 backdrop-blur-[2px] animate-in fade-in duration-300 pointer-events-auto"
+    <div
+      className="fixed inset-0 z-[5000] flex items-end justify-center md:items-center p-3 bg-black/60 backdrop-blur-sm transition-all duration-300"
       onClick={onClose}
     >
-      <div 
-        className="relative bg-white rounded-[40px] p-6 w-full max-w-[430px] max-h-[85vh] md:max-h-[90vh] shadow-[0_24px_70px_rgba(0,0,0,0.12)] flex flex-col text-gray-900 border border-gray-100/80 animate-in slide-in-from-bottom-6 duration-300 pointer-events-auto overflow-hidden animate-out fade-out zoom-out-95 duration-200"
-        onClick={e => e.stopPropagation()}
+      <div
+        className="relative w-full max-w-[480px] max-h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-6 duration-300 flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Soft Ambient Color Glow behind card content */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-[var(--primary)]/4 to-blue-500/4 -z-20 pointer-events-none" />
+        {/* Approval‑style "NO BROKERAGE" stamp (like "APPROVED" seal in 2nd image) */}
+        <div className="absolute top-[48%] left-[74%] -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none opacity-[0.12] select-none">
+          <svg viewBox="0 0 200 200" className="w-[140px] h-[140px] rotate-[-12deg]">
+            <defs>
+              {/* High-fidelity grunge ink distress filter */}
+              <filter id="grunge-ink" x="-20%" y="-20%" width="140%" height="140%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="4" result="noise" />
+                <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2" xChannelSelector="R" yChannelSelector="G" />
+              </filter>
+              {/* Precise circular text paths */}
+              <path id="topStampPath" d="M 30 100 A 70 70 0 0 1 170 100" fill="none" />
+              <path id="bottomStampPath" d="M 170 100 A 70 70 0 0 1 30 100" fill="none" />
+            </defs>
+            <g filter="url(#grunge-ink)" stroke="#FF5211" fill="#FF5211">
+              {/* Outer thick distressed ring */}
+              <circle cx="100" cy="100" r="85" fill="none" strokeWidth="5.5" />
+              {/* Outer thin concentric ring */}
+              <circle cx="100" cy="100" r="77" fill="none" strokeWidth="1.5" />
+              
+              {/* Inner details */}
+              <circle cx="100" cy="100" r="54" fill="none" strokeWidth="1" strokeDasharray="3 3" />
+              <circle cx="100" cy="100" r="50" fill="none" strokeWidth="1.5" />
 
-        {/* Distressed Horizontal Parallel Watermark Stamp (NOT NEGOTIABLE Style) */}
-        <div className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 rotate-[-8deg] z-0 select-none pointer-events-none w-[115%] flex flex-col items-center justify-center">
-          <div className="w-full border-y-[2.5px] border-[var(--primary)]/[0.045] py-2 flex items-center justify-center">
-            <span className="text-[34px] font-black text-[var(--primary)]/[0.055] tracking-[0.2em] uppercase leading-none font-serif select-none">
-              NO BROKERAGE
-            </span>
+              {/* Top curved rim text */}
+              <text className="font-sans font-black tracking-[0.2em] text-[11px]" dy="-3">
+                <textPath href="#topStampPath" startOffset="50%" textAnchor="middle">
+                  ★ DIRECT DEAL ★
+                </textPath>
+              </text>
+
+              {/* Bottom curved rim text */}
+              <text className="font-sans font-black tracking-[0.25em] text-[10.5px]" dy="11">
+                <textPath href="#bottomStampPath" startOffset="50%" textAnchor="middle">
+                  ★ 100% VERIFIED ★
+                </textPath>
+              </text>
+
+              {/* Central Slanted Banner Box */}
+              <g transform="rotate(-6, 100, 100)">
+                {/* Solid white band backing to prevent lower contents bleeding through text */}
+                <rect x="15" y="80" width="170" height="40" fill="#FFFFFF" />
+                {/* Thick banner borders */}
+                <line x1="12" y1="80" x2="188" y2="80" strokeWidth="3.5" />
+                <line x1="12" y1="120" x2="188" y2="120" strokeWidth="3.5" />
+                
+                {/* Heavy Bold Central Text */}
+                <text x="100" y="109" textAnchor="middle" className="font-sans font-black tracking-[0.05em] text-[20px]" stroke="none">
+                  NO BROKERAGE
+                </text>
+              </g>
+
+              {/* Stars above and below slanted banner */}
+              <polygon points="100,58 102,63 107,63 103,66 105,71 100,68 95,71 97,66 93,63 98,63" />
+              <polygon points="100,128 102,133 107,133 103,136 105,141 100,138 95,141 97,136 93,133 98,133" />
+            </g>
+          </svg>
+        </div>
+
+        {/* Image Carousel - compact height */}
+        <div className="relative w-full h-[180px] sm:h-[200px] overflow-hidden bg-gray-100 group">
+          {imageList.length > 0 ? (
+            <>
+              <Image
+                src={imageList[currentImageIndex]}
+                alt={currentRoom.name}
+                fill
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+              {imageList.length > 1 && (
+                <>
+                  <button
+                    onClick={prevImage}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/80 rounded-full flex items-center justify-center shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    onClick={nextImage}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 bg-white/80 rounded-full flex items-center justify-center shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                    {imageList.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentImageIndex(idx)}
+                        className={`transition-all ${
+                          idx === currentImageIndex
+                            ? "w-5 h-1 bg-white rounded-full"
+                            : "w-1 h-1 bg-white/60 rounded-full"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
+              <Building2 size={42} className="text-gray-300" />
+              <p className="text-[10px] font-semibold text-gray-400 mt-2">No images</p>
+            </div>
+          )}
+
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-md z-20"
+          >
+            <X size={16} />
+          </button>
+          <div className="absolute top-3 left-3 px-2 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold uppercase flex items-center gap-1 z-20">
+            <div className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+            Available
           </div>
         </div>
 
-        {/* Floating Top-Right Exit Button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-5 right-5 w-9 h-9 bg-gray-50/80 hover:bg-gray-100 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-900 transition-all z-20 pointer-events-auto border border-gray-100 hover:scale-105 active:scale-95 shadow-sm"
-          aria-label="Close"
-        >
-          <X size={16} strokeWidth={2.5} />
-        </button>
-
-        {/* Scrollable Content Container to prevent overflow on small screens */}
-        <div className="flex-1 overflow-y-auto pr-1.5 -mr-2.5 flex flex-col gap-5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-200 hover:[&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full transition-colors">
-          
-          {/* Gallery / Images Row */}
-          <div className="relative flex gap-4 items-center z-10 pt-1">
-            {/* Main room photo with premium micro-shadow */}
-            <div className="relative w-[180px] h-[160px] rounded-[28px] overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.05)] bg-gray-50 shrink-0 group border border-gray-100">
-              <Image 
-                src={room.image || "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=400&auto=format&fit=crop"}
-                alt={room.name}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-
-            {/* Add Photos button with gradient shimmers */}
-            <Link
-              href="/post"
-              className="flex-1 h-[160px] border-2 border-dashed border-gray-200 hover:border-[var(--primary)]/30 rounded-[28px] flex flex-col items-center justify-center gap-2 bg-gray-50/50 hover:bg-gradient-to-tr hover:from-white hover:to-[var(--primary)]/[0.03] transition-all group pointer-events-auto"
-            >
-              <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-[var(--primary)] group-hover:scale-110 group-hover:bg-[var(--primary)] group-hover:text-white transition-all duration-300 border border-gray-100">
-                <span className="text-xl font-black">+</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-700 group-hover:text-[var(--primary)] transition-colors">Add Photos</span>
-                <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 mt-0.5">Upload Now</span>
-              </div>
-            </Link>
-          </div>
-
-          {/* Property Type & Availability Title Row */}
-          <div className="flex items-center justify-between gap-4 mt-1 z-10 relative">
-            <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-black uppercase tracking-widest text-[var(--primary)]">
-                {room.category || 'Co-Living'} Space
+        {/* Scrollable Content - reduced spacing */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 [&::-webkit-scrollbar]:w-1">
+          {/* Title & Favorite */}
+          <div className="flex justify-between items-start gap-2">
+            <div>
+              <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">
+                {currentRoom.category?.toUpperCase() || "RENT"}
               </span>
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none">
-                {room.name || room.type}
+              <h2 className="text-xl font-bold text-gray-900 leading-tight">
+                {currentRoom.name || currentRoom.type}
               </h2>
             </div>
-            
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Heart Favorite Trigger */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsFavorited(!isFavorited);
-                }}
-                className="w-9 h-9 bg-gray-50 hover:bg-red-50 hover:border-red-100 rounded-full flex items-center justify-center shadow-sm hover:scale-110 active:scale-95 transition-all z-20 pointer-events-auto border border-gray-100 group"
-                aria-label="Favorite listing"
-              >
-                <Heart 
-                  size={15} 
-                  className={`transition-all duration-300 ${isFavorited ? 'text-red-500 fill-red-500 scale-125 animate-in zoom-in-75' : 'text-gray-400 group-hover:text-red-500 group-hover:scale-110'}`} 
-                  strokeWidth={2.5}
-                />
-              </button>
+            <button
+              onClick={() => setIsFavorited(!isFavorited)}
+              className="p-1.5 rounded-full border border-gray-200 bg-white shadow-sm"
+            >
+              <Heart size={18} className={isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"} />
+            </button>
+          </div>
 
-              {/* Glassmorphic Available Badge */}
-              <div className="px-3 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-600 flex items-center gap-1.5 text-[9px] font-black tracking-wider uppercase backdrop-blur-sm shrink-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                AVAILABLE
-              </div>
+          {/* Price & Deposit */}
+          <div className="flex flex-wrap items-baseline gap-2">
+            <div className="flex items-baseline gap-0.5">
+              <span className="text-2xl font-black text-gray-900">₹{currentRoom.rent.toLocaleString("en-IN")}</span>
+              <span className="text-xs text-gray-500">/month</span>
+            </div>
+            <div className="px-2 py-0.5 bg-orange-50 rounded-full text-[10px] font-bold text-orange-600 border border-orange-100">
+              {currentRoom.furnished || "1 Month Deposit"}
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap leading-none z-10 relative">
-            <div className="flex items-baseline text-gray-400 text-xs">
-              <span className="text-[34px] font-black text-gray-900 tracking-tight">₹ {room.rent.toLocaleString('en-IN')}</span>
-              <span className="font-bold ml-1">/month</span>
+          {/* Tags */}
+          <div className="flex flex-wrap gap-1.5">
+            <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-full text-[10px] font-semibold text-gray-700">
+              <Home size={10} />
+              {currentRoom.category === "travelers" ? "Looking" : "Rent"}
             </div>
-
-            {/* Subtle Premium Lease Deposit Badge */}
-            <div className="px-2.5 py-1.5 bg-gray-50 border border-gray-100 rounded-xl flex items-center gap-1.5 text-[9px] font-black text-gray-500 tracking-wider uppercase shadow-[0_1px_4px_rgba(0,0,0,0.01)] shrink-0 select-none">
-              <div className="w-1 h-1 rounded-full bg-[var(--primary)]" />
-              <span>Deposit: 1 Month</span>
+            <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-full text-[10px] font-semibold text-gray-700">
+              <Sparkles size={10} />
+              {currentRoom.type || "Room"}
             </div>
           </div>
 
-          {/* Location & Distance Details (Gradient Elevated Card) */}
-          <div className="flex flex-col gap-3 p-4 bg-gradient-to-b from-gray-50/80 to-gray-50/20 border border-gray-100 rounded-[28px] z-10 relative shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
-            <div className="flex items-start gap-2.5">
-              <MapPin size={16} className="text-[var(--primary)] shrink-0 mt-0.5" strokeWidth={2.5} />
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-gray-700 leading-normal">
-                  {room.location || `Sector ${Math.floor(Math.abs(room.lat * 1000) % 20) + 1}, ${room.city}`}
-                </span>
-                <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${room.lat},${room.lng}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-[10px] font-black text-[var(--primary)] hover:underline inline-flex items-center gap-0.5 mt-0.5 pointer-events-auto"
+          {/* Location + Distance - compact */}
+          <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-100">
+            <div className="flex gap-2">
+              <MapPin size={14} className="text-orange-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-gray-800">
+                  {currentRoom.location ||
+                    `Sector ${Math.floor(Math.abs(currentRoom.lat * 1000) % 20) + 1}, ${currentRoom.city}`}
+                </p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${currentRoom.lat},${currentRoom.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] font-bold text-orange-500 inline-flex items-center gap-0.5"
                 >
-                  Open in Google Maps <span className="text-xs">→</span>
+                  Open in Maps ↗
                 </a>
               </div>
             </div>
-
-            <div className="flex items-center gap-2.5 text-xs text-gray-500 font-bold ml-0.5 border-t border-gray-100/80 pt-2.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shrink-0" />
+            <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-semibold border-t border-gray-200/70 pt-1.5">
+              <div className="w-1 h-1 rounded-full bg-orange-500" />
               <span>
-                <span className="text-[var(--primary)] font-black">{distanceText}</span> • from your location
+                <span className="text-orange-600">{distanceText}</span> from your location
               </span>
             </div>
           </div>
 
-          {/* Dynamic Multi-Specs Row */}
-          <div className="flex items-center justify-center gap-3.5 py-0.5 z-10 relative">
-            <div className="flex items-center gap-1.5 px-4 py-2 bg-gray-50 border border-gray-100 rounded-full shadow-sm text-[9px] font-black text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors">
-              <Home size={12} className="text-gray-400" />
-              {room.category || 'Semi-Furnished'}
+          {/* Recommended Listings - compact */}
+          {recommendedList.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold text-gray-700">✨ More like this</h3>
+                <span className="text-[8px] text-gray-400 uppercase">swipe →</span>
+              </div>
+              <div className="overflow-x-auto pb-1 -mx-1 px-1 [&::-webkit-scrollbar]:h-1">
+                <div className="flex gap-2">
+                  {recommendedList.map((rec) => (
+                    <button
+                      key={rec.id}
+                      onClick={() => {
+                        setCurrentRoom(rec);
+                        setCurrentImageIndex(0);
+                        setIsFavorited(false);
+                      }}
+                      className="flex-shrink-0 w-32 bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all text-left"
+                    >
+                      <div className="relative h-20 w-full bg-gray-100">
+                        {resolveImageUrl(rec.image) ? (
+                          <Image src={resolveImageUrl(rec.image)} alt={rec.name} fill className="object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Home size={16} className="text-gray-300" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-1.5">
+                        <p className="text-[10px] font-bold text-gray-800 truncate">{rec.name}</p>
+                        <p className="text-[9px] font-black text-orange-500">₹{rec.rent.toLocaleString("en-IN")}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 px-4 py-2 bg-gray-50 border border-gray-100 rounded-full shadow-sm text-[9px] font-black text-gray-500 uppercase tracking-wider hover:bg-gray-100 transition-colors">
-              <div className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] animate-pulse" />
-              {room.type || 'Flat'}
-            </div>
-          </div>
+          )}
+        </div>
 
-          {/* Main Phone Action Button with tactile Gloss-sheen */}
+        {/* Fixed Footer - compact */}
+        <div className="p-3 pt-2 pb-3 border-t border-gray-100 bg-white space-y-2">
           <a
-            href="tel:+919876543210"
-            className="w-full py-4.5 bg-[var(--primary)] hover:bg-[var(--primary)]/95 text-white rounded-2xl font-black text-base shadow-[0_12px_28px_rgba(255,82,17,0.3)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 pointer-events-auto z-10 relative overflow-hidden group/btn"
+            href={currentRoom.phone ? `tel:${currentRoom.phone}` : "tel:+919876543210"}
+            className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-black py-2.5 rounded-xl shadow-md transition-all active:scale-98 text-sm"
           >
-            <div className="absolute inset-0 bg-white/10 -translate-y-full group-hover/btn:translate-y-0 transition-transform duration-350 pointer-events-none" />
-            <Phone size={16} fill="currentColor" className="relative z-10" />
-            <span className="relative z-10">Call Owner</span>
+            <Phone size={14} fill="currentColor" />
+            Call Owner
           </a>
-
-          {/* Padded Footer Action Buttons Row */}
-          <div className="flex gap-3 pt-1 z-10 relative">
-            {/* Directions Pill Button */}
-            <a 
-              href={`https://www.google.com/maps/dir/?api=1&destination=${room.lat},${room.lng}`}
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="flex-1 py-3 bg-gray-50/80 hover:bg-gray-100 border border-gray-150 hover:border-[var(--primary)]/20 hover:text-[var(--primary)] rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-800 transition-all pointer-events-auto hover:scale-[1.02] active:scale-[0.98] shadow-sm"
+          <div className="flex gap-2">
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${currentRoom.lat},${currentRoom.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1 py-2 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-gray-700 hover:border-orange-300 hover:text-orange-600 transition-all"
             >
-              <Navigation size={14} className="rotate-45 text-[var(--primary)]" strokeWidth={2.5} />
+              <Navigation size={12} className="rotate-45" />
               Directions
             </a>
-
-            {/* Share Pill Button */}
-            <button 
-              className="flex-1 py-3 bg-gray-50/80 hover:bg-gray-100 border border-gray-150 hover:border-[var(--primary)]/20 hover:text-[var(--primary)] rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-800 transition-all pointer-events-auto hover:scale-[1.02] active:scale-[0.98] shadow-sm"
+            <button
               onClick={() => {
                 if (navigator.share) {
-                  navigator.share({ 
-                    title: room.name, 
-                    text: `Check out ${room.name} on RoomMaps!`, 
-                    url: window.location.href 
-                  }).catch(() => {
-                    // Fallback on share errors
+                  navigator.share({ title: currentRoom.name, url: window.location.href }).catch(() => {
                     navigator.clipboard.writeText(window.location.href);
                     setIsCopied(true);
                     setTimeout(() => setIsCopied(false), 2000);
@@ -314,171 +429,85 @@ export default function RoomDetailModal({
                   setTimeout(() => setIsCopied(false), 2000);
                 }
               }}
+              className="flex-1 flex items-center justify-center gap-1 py-2 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-gray-700 hover:border-orange-300 hover:text-orange-600 transition-all"
             >
-              {isCopied ? (
-                <>
-                  <Check size={14} className="text-emerald-500 stroke-[3]" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Share2 size={14} className="text-orange-500" strokeWidth={2.5} />
-                  Share
-                </>
-              )}
+              {isCopied ? <Check size={12} /> : <Share2 size={12} />}
+              {isCopied ? "Copied!" : "Share"}
             </button>
           </div>
-
-          {/* Highlighted Flag Report Button */}
-          <div className="flex justify-center pt-2 pb-2">
-            <button 
-              onClick={() => setShowReportModal(true)} 
-              className="px-4 py-2.5 border border-red-100 hover:border-red-200 bg-red-500/[0.02] hover:bg-red-500/[0.05] rounded-xl flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-red-500 hover:text-red-650 transition-all pointer-events-auto hover:scale-[1.02] active:scale-[0.98] shadow-sm select-none"
-            >
-              <Flag size={10} className="stroke-[2.5]" />
-              Report this listing
-            </button>
-          </div>
-
+          <button
+            onClick={() => setShowReportModal(true)}
+            className="w-full flex items-center justify-center gap-1 py-1.5 text-[9px] font-bold uppercase tracking-wider text-red-500 hover:bg-red-50 rounded-lg transition-all"
+          >
+            <Flag size={10} />
+            Report
+          </button>
         </div>
 
-        {/* Elite Slide-up Inner Report Modal Overlay */}
+        {/* Report Modal (compact) */}
         {showReportModal && (
-          <div className="absolute inset-0 bg-white/98 backdrop-blur-sm z-50 p-6 flex flex-col justify-between rounded-[40px] animate-in fade-in slide-in-from-bottom-12 duration-300">
-            {/* Header */}
-            <div className="flex flex-col gap-1.5 mt-2 border-b border-gray-100 pb-3.5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-                  <Flag size={18} className="text-[var(--primary)] stroke-[2.5]" />
-                  Report Listing
-                </h3>
-                <button 
-                  onClick={() => {
-                    setShowReportModal(false);
-                    setSelectedReasonId(null);
-                    setOtherText("");
-                    setReportSubmitted(false);
-                  }}
-                  className="w-8 h-8 bg-gray-50 hover:bg-gray-100 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-900 border border-gray-100 transition-colors"
-                >
-                  <X size={14} strokeWidth={2.5} />
-                </button>
-              </div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Help us keep RoomMaps secure & accurate
-              </p>
+          <div className="absolute inset-0 z-50 bg-white rounded-2xl flex flex-col animate-in fade-in slide-in-from-bottom-8 duration-300">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Flag size={16} className="text-red-500" />
+                Report Listing
+              </h3>
+              <button onClick={() => setShowReportModal(false)} className="p-1.5 rounded-full bg-gray-50">
+                <X size={14} />
+              </button>
             </div>
-
-            {/* Content Body */}
-            <div className="flex-1 my-4 overflow-y-auto pr-1 flex flex-col gap-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {!reportSubmitted ? (
                 <>
                   {isLoadingTypes ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-12 gap-3.5">
-                      <Loader2 className="animate-spin text-[var(--primary)] shrink-0" size={32} strokeWidth={2.5} />
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">
-                        Fetching Report Options...
-                      </span>
+                    <div className="flex flex-col items-center py-6">
+                      <Loader2 className="animate-spin text-orange-500" size={20} />
+                      <span className="text-[10px] mt-1">Loading...</span>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2">
-                      {/* Render fetched options */}
-                      {reportTypes.map((type) => (
-                        <button
-                          key={type.id}
-                          onClick={() => setSelectedReasonId(type.id)}
-                          className={`w-full py-3.5 px-4 rounded-2xl border text-left text-xs font-black transition-all flex items-center justify-between group/opt ${
-                            selectedReasonId === type.id 
-                              ? 'border-[var(--primary)] border-l-[4px] border-l-[var(--primary)] bg-[var(--primary)]/[0.05] text-[var(--primary)] shadow-[0_2px_8px_rgba(255,82,17,0.06)]' 
-                              : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50 text-gray-700 hover:text-gray-900 hover:border-gray-200'
-                          }`}
-                        >
-                          <span>{type.name}</span>
-                          <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center transition-all ${
-                            selectedReasonId === type.id 
-                              ? 'border-[var(--primary)] bg-[var(--primary)] text-white scale-110 shadow-sm' 
-                              : 'border-gray-300 bg-white group-hover/opt:border-gray-400'
-                          }`}>
-                            {selectedReasonId === type.id && <Check size={10} strokeWidth={3} />}
-                          </div>
-                        </button>
-                      ))}
-
-                      {/* Default "Other" Option */}
+                    reportTypes.map((type) => (
                       <button
-                        onClick={() => setSelectedReasonId("other")}
-                        className={`w-full py-3.5 px-4 rounded-2xl border text-left text-xs font-black transition-all flex items-center justify-between group/opt ${
-                          selectedReasonId === "other" 
-                            ? 'border-[var(--primary)] border-l-[4px] border-l-[var(--primary)] bg-[var(--primary)]/[0.05] text-[var(--primary)] shadow-[0_2px_8px_rgba(255,82,17,0.06)]' 
-                            : 'border-gray-100 bg-gray-50/50 hover:bg-gray-50 text-gray-700 hover:text-gray-900 hover:border-gray-200'
+                        key={type.id}
+                        onClick={() => setSelectedReasonId(type.id)}
+                        className={`w-full p-2.5 rounded-lg border text-left flex justify-between items-center text-sm ${
+                          selectedReasonId === type.id
+                            ? "border-orange-400 bg-orange-50"
+                            : "border-gray-100 bg-gray-50"
                         }`}
                       >
-                        <span>Other</span>
-                        <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center transition-all ${
-                          selectedReasonId === "other" 
-                            ? 'border-[var(--primary)] bg-[var(--primary)] text-white scale-110 shadow-sm' 
-                            : 'border-gray-300 bg-white group-hover/opt:border-gray-400'
-                        }`}>
-                          {selectedReasonId === "other" && <Check size={10} strokeWidth={3} />}
-                        </div>
+                        <span className="text-xs font-medium">{type.name}</span>
+                        {selectedReasonId === type.id && <Check size={14} className="text-orange-500" />}
                       </button>
-                    </div>
+                    ))
                   )}
-
-                  {/* "Other" Textarea input box */}
                   {selectedReasonId === "other" && (
-                    <div className="animate-in slide-in-from-top-4 duration-300 mt-1">
-                      <textarea
-                        value={otherText}
-                        onChange={(e) => setOtherText(e.target.value)}
-                        placeholder="Please describe the issue..."
-                        className="w-full h-24 p-3.5 bg-gray-50 border border-gray-150 rounded-2xl text-xs text-gray-750 font-bold focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/20 focus:border-[var(--primary)] transition-all resize-none shadow-inner"
-                      />
-                    </div>
-                  )}
-
-                  {/* Security/Trust Informational Banner to beautifully occupy empty space */}
-                  {selectedReasonId !== "other" && !isLoadingTypes && (
-                    <div className="p-3.5 bg-[var(--primary)]/[0.02] border border-[var(--primary)]/10 rounded-2.5xl flex gap-2.5 text-[10px] text-gray-550 font-bold leading-normal animate-in fade-in duration-300 mt-2 select-none">
-                      <span className="text-[var(--primary)] text-sm shrink-0">🛡️</span>
-                      <span>
-                        Our safety team reviews all reported listings within 24 hours. Multiple false reports may lead to listing suspension to maintain a trustworthy market.
-                      </span>
-                    </div>
+                    <textarea
+                      value={otherText}
+                      onChange={(e) => setOtherText(e.target.value)}
+                      placeholder="Describe the issue..."
+                      className="w-full p-2 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-300"
+                      rows={2}
+                    />
                   )}
                 </>
               ) : (
-                /* Success screen */
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 animate-in zoom-in-95 duration-300">
-                  <div className="w-16 h-16 bg-emerald-50 border border-emerald-100 rounded-full flex items-center justify-center text-emerald-500 shadow-[0_4px_16px_rgba(16,185,129,0.12)]">
-                    <Check size={32} strokeWidth={3} />
+                <div className="flex flex-col items-center py-8 text-center">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 mb-2">
+                    <Check size={20} />
                   </div>
-                  <div className="text-center flex flex-col gap-1 mt-1">
-                    <h4 className="text-lg font-black text-gray-900 tracking-tight">Report Received</h4>
-                    <p className="text-xs font-bold text-gray-500 leading-relaxed max-w-[240px] mx-auto">
-                      Thank you for reporting. Our safety team will review this listing shortly.
-                    </p>
-                  </div>
+                  <h4 className="font-bold text-sm">Report received</h4>
+                  <p className="text-xs text-gray-500">We'll review shortly.</p>
                 </div>
               )}
             </div>
-
-            {/* Actions Footer */}
-            <div className="border-t border-gray-150 pt-4">
+            <div className="p-4 border-t border-gray-100">
               {!reportSubmitted ? (
                 <button
                   disabled={!selectedReasonId || (selectedReasonId === "other" && !otherText.trim()) || isSubmitting}
                   onClick={handleSubmitReport}
-                  className="w-full py-3.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-100 disabled:text-gray-405 disabled:cursor-not-allowed text-white rounded-2xl font-black text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 pointer-events-auto"
+                  className="w-full py-2.5 bg-gray-800 text-white rounded-lg font-bold text-sm disabled:bg-gray-200"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="animate-spin" size={16} />
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Report"
-                  )}
+                  {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={14} /> : "Submit"}
                 </button>
               ) : (
                 <button
@@ -488,15 +517,14 @@ export default function RoomDetailModal({
                     setOtherText("");
                     setReportSubmitted(false);
                   }}
-                  className="w-full py-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 text-gray-700 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 pointer-events-auto"
+                  className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-lg font-bold text-sm"
                 >
-                  Close Window
+                  Close
                 </button>
               )}
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

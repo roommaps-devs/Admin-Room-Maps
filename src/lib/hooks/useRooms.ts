@@ -1,15 +1,112 @@
 import { useState, useEffect } from 'react';
 import { getRooms } from '@/lib/data';
 import { Room } from '@/lib/types';
+import { getRequest, postRequest } from '../apiCall';
+
+// Memory cache pointers for single-fetch promise deduplication and static caching
+let cachedRooms: Room[] | null = null;
+let roomsPromise: Promise<Room[]> | null = null;
+
+export function clearRoomsCache() {
+  cachedRooms = null;
+  roomsPromise = null;
+}
+
+// Resilient image URL resolver to dynamically format absolute and relative paths
+export function resolveImageUrl(url: string | undefined): string {
+  if (!url) return '';
+  
+  let cleanUrl = url;
+  
+  // Format and secure Cloudinary URLs if present
+  if (cleanUrl.includes('cloudinary.com')) {
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = `https://${cleanUrl}`;
+    } else if (cleanUrl.startsWith('http://')) {
+      cleanUrl = cleanUrl.replace('http://', 'https://');
+    }
+  }
+
+  // Automatically upgrade unsecure http calls to secure https to satisfy Next.js RemotePatterns policy
+  if (cleanUrl.startsWith('http://backend-room-maps.onrender.com')) {
+    cleanUrl = cleanUrl.replace('http://', 'https://');
+  }
+
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    return cleanUrl;
+  }
+  const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend-room-maps.onrender.com').replace(/\/api\/?$/, '');
+  const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+  return `${backendBase}${path}`;
+}
 
 export function useRooms() {
-  const [data, setData] = useState<Room[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<Room[]>(cachedRooms || []);
+  const [isLoading, setIsLoading] = useState(!cachedRooms);
 
   useEffect(() => {
-    const rooms = getRooms() as Room[];
-    setData(rooms);
-    setIsLoading(false);
+    // If listings are already cached in memory, load them instantly with zero network request
+    if (cachedRooms) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchRooms = async () => {
+      // If there is already an in-flight API fetch promise, await it to avoid concurrent requests
+      if (roomsPromise) {
+        const rooms = await roomsPromise;
+        setData(rooms);
+        setIsLoading(false);
+        return;
+      }
+
+      // Instantiate a unified promise so all concurrent useRooms mounts share this exact network request
+      roomsPromise = (async () => {
+        try {
+          const res = await getRequest<{ success: boolean; data: any[] }>("/post/getAll");
+          if (res && res.success && Array.isArray(res.data)) {
+            const mappedRooms: Room[] = res.data.map((item: any) => {
+              const rawImg = item.images?.[0]?.uploadUrl || item.images?.[0]?.url || (typeof item.images?.[0] === 'string' ? item.images[0] : null) || item.image;
+              return {
+                id: item.id || item.postId || Math.random().toString(),
+                name: item.name || item.title || 'Room Listing',
+                city: item.city || 'Chandigarh',
+                rent: Number(item.rent) || 10000,
+                lat: Number(item.lat) || 30.7333,
+                lng: Number(item.lng) || 76.7794,
+                category: String(item.category || 'rent').toLowerCase(),
+                type: item.type || item.propertyType || 'Room',
+                image: resolveImageUrl(rawImg),
+                images: item.images ? item.images.map((img: any) => typeof img === 'string' ? img : (img.uploadUrl || img.url)).filter(Boolean) : [],
+                location: item.address || item.location,
+                isTrending: !!item.isTrending,
+                owner: item.owner,
+                phone: item.phone,
+                amenities: item.amenities || [],
+                furnished: item.furnished,
+                bhk: item.bhk,
+                gender: item.gender
+              };
+            });
+            cachedRooms = mappedRooms;
+            return mappedRooms;
+          } else {
+            cachedRooms = getRooms() as Room[];
+            return cachedRooms;
+          }
+        } catch (err) {
+          console.error("Failed to fetch rooms from backend API, using local mock fallbacks:", err);
+          cachedRooms = getRooms() as Room[];
+          return cachedRooms;
+        }
+      })();
+
+      const rooms = await roomsPromise;
+      setData(rooms);
+      setIsLoading(false);
+    };
+    
+    fetchRooms();
   }, []);
 
   return { data, isLoading };
@@ -21,29 +118,21 @@ export function useUniqueCities() {
   return { data: cities };
 }
 
-import { addRoom } from '../data';
-
 export function useAddRoom() {
   const [isLoading, setIsLoading] = useState(false);
 
   const mutateAsync = async (roomData: any) => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const newId = Math.random().toString(36).substring(2, 9);
-    const newRoom: Room = {
-      id: newId,
-      name: roomData.name || 'Room Listing',
-      city: roomData.city || 'Chandigarh',
-      rent: Number(roomData.rent) || 10000,
-      lat: Number(roomData.lat) || 30.7333,
-      lng: Number(roomData.lng) || 76.7794,
-      category: roomData.category || 'rent',
-      type: roomData.propertyType || 'Room',
-      image: roomData.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80',
-    };
-    addRoom(newRoom);
-    setIsLoading(false);
-    return newId;
+    try {
+      const res = await postRequest<{ success: boolean; data: any }>("/post/create", { data: roomData });
+      setIsLoading(false);
+      clearRoomsCache(); // Invalidate cache so the next visit loads the freshly added listing E2E!
+      return res?.data?.id || res?.data?.postId || Math.random().toString();
+    } catch (error) {
+      setIsLoading(false);
+      console.error("Failed to create post on API:", error);
+      throw error;
+    }
   };
 
   return {
@@ -61,4 +150,3 @@ export function useAddRoomImages() {
     isLoading: false,
   };
 }
-

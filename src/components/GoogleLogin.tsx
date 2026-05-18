@@ -111,7 +111,7 @@ export default function GoogleLogin() {
         // Verify token & set user
         if (accessToken) {
           const verifyRes = await postRequest<ApiResponse<any>>("/auth/verify", { accessToken });
-          setCookie("drive_access_token", accessToken);
+          setCookie("drive_access_token", accessToken, { path: '/' });
 
           if (verifyRes.success) {
             dispatch(setUser(verifyRes.data?.user || verifyRes.data || data.data?.user));
