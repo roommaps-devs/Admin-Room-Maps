@@ -28,6 +28,7 @@ interface RoomDetailModalProps {
   room: Room | null;
   searchCenter?: [number, number];
   similarRooms?: Room[];
+  viewMode?: "bottom-sheet" | "centered";
 }
 
 interface ReportType {
@@ -54,6 +55,7 @@ export default function RoomDetailModal({
   room: initialRoom,
   searchCenter,
   similarRooms: externalSimilarRooms = [],
+  viewMode,
 }: RoomDetailModalProps) {
   const [currentRoom, setCurrentRoom] = useState<Room | null>(initialRoom);
   const [isFavorited, setIsFavorited] = useState(false);
