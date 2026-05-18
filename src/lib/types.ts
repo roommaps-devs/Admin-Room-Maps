@@ -8,10 +8,17 @@ export interface Room {
   category: string;
   type: string;
   image?: string;
+  images?: string[];
   isTrending?: boolean;
   location?: string;
   isTravelerFriendly?: boolean;
   rentType?: string;
+  furnished?: string;
+  owner?: string;
+  phone?: string;
+  amenities?: string[];
+  bhk?: string;
+  gender?: string;
 }
 
 export interface User {

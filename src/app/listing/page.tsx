@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import { useRooms } from '@/lib/hooks/useRooms';
+import { useRooms, resolveImageUrl } from '@/lib/hooks/useRooms';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPin, IndianRupee, Star, ShieldCheck, Search } from 'lucide-react';
+import { MapPin, IndianRupee, Star, ShieldCheck, Search, Home } from 'lucide-react';
 
 export default function ListingPage() {
   const { data: rooms, isLoading } = useRooms();
@@ -59,12 +59,20 @@ export default function ListingPage() {
                 className="group flex flex-col bg-white rounded-[32px] overflow-hidden border border-[#0A0A0A]/5 hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] hover:-translate-y-2 transition-all duration-500"
               >
                 <div className="relative h-64 overflow-hidden">
-                  <Image
-                    src={room.image || "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&auto=format&fit=crop"}
-                    alt={room.name}
-                    fill
-                    className="object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
+                  {resolveImageUrl(room.image) ? (
+                    <Image
+                      src={resolveImageUrl(room.image)}
+                      alt={room.name}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 border-b border-gray-150 gap-2 relative select-none">
+                      <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100/50" />
+                      <Home size={34} className="text-gray-300 relative z-10 group-hover:scale-110 transition-transform duration-500" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 relative z-10">No Image Available</span>
+                    </div>
+                  )}
                   <div className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur-md rounded-xl text-xs font-black text-[#0A0A0A] shadow-sm flex items-center gap-1.5">
                     <ShieldCheck size={14} className="text-[#22c55e]" />
                     VERIFIED
