@@ -1,12 +1,43 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useRooms, resolveImageUrl } from '@/lib/hooks/useRooms';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import Image from 'next/image';
 import Link from 'next/link';
 import { MapPin, IndianRupee, Star, ShieldCheck, Search, Home } from 'lucide-react';
+
+const url = process.env.NEXT_PUBLIC_IMAGE_URL!;
+
+interface RoomCardImageProps {
+  src: string;
+  alt: string;
+}
+
+function RoomCardImage({ src, alt }: RoomCardImageProps) {
+  const [error, setError] = useState(false);
+
+  if (error || !src) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#FAFAF8] border border-[#0A0A0A]/5">
+        <Home size={40} className="text-[#0A0A0A]/20" />
+        <span className="text-[10px] font-bold text-[#0A0A0A]/40 uppercase tracking-wider mt-2">No Image</span>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={500}
+      height={500}
+      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+      onError={() => setError(true)}
+    />
+  );
+}
 
 export default function ListingPage() {
   const { data: rooms, isLoading } = useRooms();
@@ -26,6 +57,8 @@ export default function ListingPage() {
       </div>
     );
   }
+
+console.log(url , "ursssl")  
 
   return (
     <div className="min-h-screen bg-[#FAFAF8] pt-28 pb-20 px-6">
@@ -59,20 +92,30 @@ export default function ListingPage() {
                 className="group flex flex-col bg-white rounded-[32px] overflow-hidden border border-[#0A0A0A]/5 hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] hover:-translate-y-2 transition-all duration-500"
               >
                 <div className="relative h-64 overflow-hidden">
-                  {resolveImageUrl(room.image) ? (
-                    <Image
-                      src={resolveImageUrl(room.image)}
-                      alt={room.name}
-                      fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-110"
+                
+
+                  {room?.images && room?.images?.length > 0 ? (
+                    room?.images?.map((img, index) => (
+                      <RoomCardImage
+                        key={`${img}-${index}`}
+                        src={`${url}${img}`}
+                        alt={room?.name}
+                      />
+                    ))
+                  ) : room?.image ? (
+                    <RoomCardImage
+                      src={room.image}
+                      alt={room?.name}
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 border-b border-gray-150 gap-2 relative select-none">
-                      <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100/50" />
-                      <Home size={34} className="text-gray-300 relative z-10 group-hover:scale-110 transition-transform duration-500" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 relative z-10">No Image Available</span>
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#FAFAF8] border border-[#0A0A0A]/5">
+                      <Home size={40} className="text-[#0A0A0A]/20" />
+                      <span className="text-[10px] font-bold text-[#0A0A0A]/40 uppercase tracking-wider mt-2">No Image</span>
                     </div>
                   )}
+
+
+
                   <div className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur-md rounded-xl text-xs font-black text-[#0A0A0A] shadow-sm flex items-center gap-1.5">
                     <ShieldCheck size={14} className="text-[#22c55e]" />
                     VERIFIED
