@@ -115,7 +115,7 @@ export default function GoogleLogin() {
 
           if (verifyRes.success) {
             dispatch(setUser(verifyRes.data?.user || verifyRes.data || data.data?.user));
-            router.push("/dashboard");
+            router.push("/");
           } else {
             router.push("/login");
           }
@@ -132,6 +132,7 @@ export default function GoogleLogin() {
 
   return (
     <button
+      type="button"
       onClick={loginWithGoogle}
       disabled={loading}
       className="w-full bg-brand-surface text-brand-text-primary border border-black/10 dark:border-white/20 rounded-2xl py-3.5 text-sm font-bold flex items-center justify-center gap-3 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(0,0,0,0.05)] active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed hover:bg-brand-surface-elevated"

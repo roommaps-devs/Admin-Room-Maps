@@ -18,7 +18,7 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
   closeProfileMenu: () => void;
   menuRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  
+
   // Handle outside clicks to close profile menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -29,6 +29,9 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
     if (isProfileMenuOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isProfileMenuOpen, menuRef, closeProfileMenu]);
+
+
+  console.log(user, "user")
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-[2000] flex justify-center items-center px-[5%] py-3 bg-[var(--glass-bg)] backdrop-blur-[24px] backdrop-saturate-[180%] border-b border-[var(--glass-border)] w-full transition-all duration-300 shadow-[0_1px_1px_rgba(0,0,0,0.02),0_4px_12px_rgba(0,0,0,0.03)]">
@@ -41,7 +44,7 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
         </div>
 
         <div className="hidden md:flex items-center justify-center flex-[2]">
-          <ModeToggle 
+          <ModeToggle
             mode={mode}
             onChange={setMode}
           />
@@ -51,28 +54,33 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
           <div className="flex items-center gap-4">
             {user ? (
               <div ref={menuRef} className="relative flex items-center">
-                <div
-                  className={`
-                    flex items-center gap-3 p-1 sm:pl-5 sm:pr-1.5
-                    bg-[var(--bg-surface)]/60 backdrop-blur-2xl rounded-full 
-                    border border-[var(--glass-border)] 
-                    transition-all duration-500 cursor-pointer 
-                    shadow-[0_4px_16px_rgba(0,0,0,0.02)] 
-                    hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] 
-                    hover:border-[var(--primary)]/20 hover:-translate-y-0.5 active:scale-95
-                    ${isProfileMenuOpen ? 'ring-2 ring-[var(--primary)]/20 border-[var(--primary)]/30 bg-[var(--bg-surface-elevated)]' : ''}
-                  `}
-                  onClick={() => isProfileMenuOpen ? closeProfileMenu() : openProfileMenu()}
-                >
-                  <span className="hidden sm:inline text-[14px] font-bold text-[var(--text-primary)] tracking-tight whitespace-nowrap">{user.name || user.displayName}</span>
-                  <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-md">
-                    <img
-                      src={user.image || user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.displayName || 'User')}`}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
+               <div
+  onClick={() =>
+    isProfileMenuOpen ? closeProfileMenu() : openProfileMenu()
+  }
+  className={`
+    flex items-center justify-center
+    w-11 h-11
+    rounded-full
+    cursor-pointer
+    transition-all duration-300
+    border border-white/10
+    bg-white/5 backdrop-blur-xl
+    hover:bg-white/10
+    hover:scale-[1.03]
+    active:scale-95
+    shadow-lg
+    ${
+      isProfileMenuOpen
+        ? "ring-2 ring-orange-500/30 bg-white/10"
+        : ""
+    }
+  `}
+>
+  <span className="text-[16px] font-semibold text-orange-500">
+    {user?.email?.charAt(0)?.toUpperCase() || "U"}
+  </span>
+</div>
 
                 {isProfileMenuOpen && (
                   <div className="absolute top-[135%] right-0 sm:right-0 bg-[var(--bg-surface-elevated)]/98 backdrop-blur-[32px] border border-[var(--glass-border)] shadow-[0_40px_80px_rgba(0,0,0,0.18)] rounded-[32px] p-2.5 min-w-[260px] z-50 animate-in fade-in zoom-in-95 duration-300 origin-top-right">
@@ -89,10 +97,10 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
                         <span className="text-[11px] font-black text-[var(--text-primary)]/30 tracking-widest uppercase truncate">{user.email?.split('@')[0]}</span>
                       </div>
                     </div>
-                    
+
                     <div className="px-1.5 space-y-1">
-                      <Link 
-                        href="/profile" 
+                      <Link
+                        href="/profile"
                         className="flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-[14px] font-bold transition-all duration-300 text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] group"
                         onClick={closeProfileMenu}
                       >
@@ -101,8 +109,8 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
                         </div>
                         View Profile
                       </Link>
-                      <Link 
-                        href="/profile/settings" 
+                      <Link
+                        href="/profile/settings"
                         className="flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-[14px] font-bold transition-all duration-300 text-[var(--text-primary)]/60 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] group"
                         onClick={closeProfileMenu}
                       >
@@ -111,11 +119,11 @@ export default function Navbar({ mode, setMode, user, logout, isProfileMenuOpen,
                         </div>
                         Account Settings
                       </Link>
-                      
+
                       <div className="h-px bg-[var(--glass-border)] mx-4 my-2" />
 
-                      <button 
-                        className="flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-[14px] font-bold transition-all duration-300 text-red-500/70 hover:text-red-600 hover:bg-red-500/5 group" 
+                      <button
+                        className="flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-[14px] font-bold transition-all duration-300 text-red-500/70 hover:text-red-600 hover:bg-red-500/5 group"
                         onClick={logout}
                       >
                         <div className="w-9 h-9 rounded-xl bg-red-500/5 flex items-center justify-center group-hover:bg-red-500/10 transition-all duration-300">

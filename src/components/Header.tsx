@@ -31,7 +31,7 @@ export default function Header() {
   if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/map") return null;
 
   return (
-    <Navbar 
+    <Navbar
       mode={mode}
       setMode={(m) => dispatch(setMode(m))}
       user={isAuthenticated ? user : null}

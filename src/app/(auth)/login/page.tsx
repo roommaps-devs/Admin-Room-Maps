@@ -92,7 +92,7 @@ function LoginContent() {
         setCookie("drive_access_token", token);
         if (res.success) {
           dispatch(setUser(res.data?.user || res.data || userData));
-          router.push("/dashboard");
+          router.push("/");
         } else {
           router.push("/login");
         }
