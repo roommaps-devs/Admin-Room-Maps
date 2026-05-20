@@ -28,7 +28,8 @@ import MapView from './MapView';
 import MapLoading from './MapLoading';
 
 // TanStack Query hooks
-import { useAddRoom } from '@/lib/hooks/useRooms';
+import { useAddRoom, resolveImageUrl } from '@/lib/hooks/useRooms';
+import { getRequest } from '@/lib/apiCall';
 
 // Redux
 import { useSelector, useDispatch } from 'react-redux';
@@ -90,6 +91,8 @@ export default function MapComponent({
     priceRange,
   } = useSelector((state: RootState) => state.map);
 
+  const isAreaView = mapZoom > 13;
+
   // For logout modal, I'll use a local state or check if there's a uiSlice for it
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const closeLogoutModal = () => setIsLogoutModalOpen(false);
@@ -97,6 +100,64 @@ export default function MapComponent({
   // Local UI state
   const [mapCenter, setMapCenter] = useState<[number, number]>([DEFAULT_LAT, DEFAULT_LNG]);
   const [useFlyTo, setUseFlyTo] = useState(false);
+  const [dynamicRooms, setDynamicRooms] = useState<Room[]>(rooms);
+  const [viewportCounts, setViewportCounts] = useState<{
+    total: number;
+    cityWise: Record<string, number>;
+    areaWise: Record<string, number>;
+    stateWise: Record<string, number>;
+  } | null>(() => {
+    if (!rooms || rooms.length === 0) return null;
+    const cityWise: Record<string, number> = {};
+    const areaWise: Record<string, number> = {};
+    const stateWise: Record<string, number> = {};
+    rooms.forEach((room) => {
+      if (room.city) {
+        const cityKey = room.city.trim();
+        cityWise[cityKey] = (cityWise[cityKey] || 0) + 1;
+      }
+      if (room.state) {
+        const stateKey = room.state.trim();
+        stateWise[stateKey] = (stateWise[stateKey] || 0) + 1;
+      }
+      const areaKey = room.area || room.location?.split(',')[0]?.trim() || room.city || 'Unknown Area';
+      areaWise[areaKey] = (areaWise[areaKey] || 0) + 1;
+    });
+    return {
+      total: rooms.length,
+      cityWise,
+      areaWise,
+      stateWise,
+    };
+  });
+
+  // Sync with initial rooms if they change
+  useEffect(() => {
+    setDynamicRooms(rooms);
+    if (rooms && rooms.length > 0) {
+      const cityWise: Record<string, number> = {};
+      const areaWise: Record<string, number> = {};
+      const stateWise: Record<string, number> = {};
+      rooms.forEach((room) => {
+        if (room.city) {
+          const cityKey = room.city.trim();
+          cityWise[cityKey] = (cityWise[cityKey] || 0) + 1;
+        }
+        if (room.state) {
+          const stateKey = room.state.trim();
+          stateWise[stateKey] = (stateWise[stateKey] || 0) + 1;
+        }
+        const areaKey = room.area || room.location?.split(',')[0]?.trim() || room.city || 'Unknown Area';
+        areaWise[areaKey] = (areaWise[areaKey] || 0) + 1;
+      });
+      setViewportCounts({
+        total: rooms.length,
+        cityWise,
+        areaWise,
+        stateWise,
+      });
+    }
+  }, [rooms]);
   const [showRoomsList, setShowRoomsList] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
@@ -232,19 +293,76 @@ export default function MapComponent({
 
   // Filtered Rooms logic
   const filteredRooms = useMemo(() => {
-    return rooms.filter(room => {
+    return dynamicRooms.filter(room => {
       const roomCategory = room.category || 'rent';
       const withinPrice = room.rent >= priceRange[0] && room.rent <= priceRange[1];
       return roomCategory === mode && room.lat && room.lng && withinPrice;
     });
-  }, [rooms, mode, priceRange]);
+  }, [dynamicRooms, mode, priceRange]);
+
+  // Spiral Jittering for Overlapping Coordinates (visual map markers only)
+  const jitteredRooms = useMemo(() => {
+    const coordCounts: Record<string, number> = {};
+    return filteredRooms.map(room => {
+      const lat = Number(room.lat);
+      const lng = Number(room.lng);
+      if (!lat || !lng) return room;
+
+      const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+      const count = coordCounts[key] || 0;
+      coordCounts[key] = count + 1;
+
+      if (count === 0) {
+        return room;
+      }
+
+      // Compute spiral offset: count * 0.9 rad step, radius scales with sqrt(count)
+      const angle = count * 0.9;
+      const radius = 0.00012 * Math.sqrt(count); // ~13 meters
+      const newLat = lat + radius * Math.sin(angle);
+      const newLng = lng + radius * Math.cos(angle);
+
+      return {
+        ...room,
+        lat: newLat,
+        lng: newLng
+      };
+    });
+  }, [filteredRooms]);
+
+  // Navigate Map to Location Viewport (Area or City)
+  const handleLocationClick = useCallback(async (name: string, type: 'area' | 'city', cityContext?: string) => {
+    let resolvedCity = cityContext;
+    if (type === 'area' && !resolvedCity) {
+      // Find a room with this area in dynamicRooms
+      const matchingRoom = dynamicRooms.find(r => r.area === name || (r.location && r.location.split(',')[0].trim() === name));
+      if (matchingRoom) {
+        resolvedCity = matchingRoom.city;
+      }
+    }
+    const query = type === 'area' ? `${name}, ${resolvedCity || 'Chandigarh'}` : name;
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}&provider=nominatim`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const coords: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        dispatch(setSearchCenter(coords));
+        setMapCenter(coords);
+        dispatch(setMapZoom(type === 'area' ? 16 : 14));
+        setUseFlyTo(true);
+        dispatch(setSearchQuery(name));
+      }
+    } catch (e) {
+      if (process.env.NODE_ENV !== "production") console.error(e);
+    }
+  }, [dispatch, dynamicRooms]);
 
   const missingLocationCount = useMemo(() => {
-    return rooms.filter(room => {
+    return dynamicRooms.filter(room => {
       const roomCategory = room.category || 'rent';
       return roomCategory === mode && (!room.lat || !room.lng);
     }).length;
-  }, [rooms, mode]);
+  }, [dynamicRooms, mode]);
 
   const inRangeRooms = useMemo(() => {
     return filteredRooms.filter(room => {
@@ -279,6 +397,106 @@ export default function MapComponent({
   const handleSetUseFlyTo = useCallback((use: boolean) => {
     setUseFlyTo(use);
   }, []);
+
+  const lastBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(null);
+  const lastFiltersRef = useRef<{ mode: string; priceRange: [number, number] } | null>(null);
+
+  const handleBoundsChange = useCallback(async (bounds: { north: number; south: number; east: number; west: number }) => {
+    const filtersChanged = !lastFiltersRef.current || 
+                           lastFiltersRef.current.mode !== mode || 
+                           lastFiltersRef.current.priceRange[0] !== priceRange[0] || 
+                           lastFiltersRef.current.priceRange[1] !== priceRange[1];
+
+    if (
+      !filtersChanged &&
+      lastBoundsRef.current &&
+      lastBoundsRef.current.north === bounds.north &&
+      lastBoundsRef.current.south === bounds.south &&
+      lastBoundsRef.current.east === bounds.east &&
+      lastBoundsRef.current.west === bounds.west
+    ) {
+      return;
+    }
+    lastBoundsRef.current = bounds;
+    lastFiltersRef.current = { mode, priceRange };
+
+    try {
+      let url = `/post/getMapPosts?north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}`;
+      if (mode) {
+        url += `&category=${encodeURIComponent(mode)}`;
+      }
+      if (priceRange[0] > 0) {
+        url += `&minPrice=${priceRange[0]}`;
+      }
+      if (priceRange[1] < 1000000) {
+        url += `&maxPrice=${priceRange[1]}`;
+      }
+
+      const res = await getRequest<{ success: boolean; data: any }>(url);
+      if (res?.success && res.data) {
+        let postsData: any[] = [];
+        let countsData: any = null;
+
+        if (res.data.posts && Array.isArray(res.data.posts)) {
+          postsData = res.data.posts;
+          countsData = res.data.counts;
+        } else if (Array.isArray(res.data)) {
+          postsData = res.data;
+          // Fallback client-side calculation
+          const cityWise: Record<string, number> = {};
+          const areaWise: Record<string, number> = {};
+          const stateWise: Record<string, number> = {};
+          res.data.forEach((item: any) => {
+            if (item.city) {
+              const cityKey = item.city.trim();
+              cityWise[cityKey] = (cityWise[cityKey] || 0) + 1;
+            }
+            if (item.state) {
+              const stateKey = item.state.trim();
+              stateWise[stateKey] = (stateWise[stateKey] || 0) + 1;
+            }
+            const areaKey = item.area || item.address?.split(',')[0]?.trim() || item.city || 'Unknown Area';
+            areaWise[areaKey] = (areaWise[areaKey] || 0) + 1;
+          });
+          countsData = {
+            total: res.data.length,
+            cityWise,
+            areaWise,
+            stateWise
+          };
+        }
+
+        const mapped: Room[] = postsData.map((item: any) => {
+          const rawImg = item.image || item.images?.[0]?.url || item.images?.[0]?.uploadUrl;
+          return {
+            id: item.id || item.postId || Math.random().toString(),
+            name: item.name || item.title || `${item.bhk || ''} ${item.type || 'Room'}`.trim() || 'Room Listing',
+            city: item.city || 'Chandigarh',
+            rent: Number(item.rent) || 10000,
+            lat: Number(item.lat) || 30.7333,
+            lng: Number(item.lng) || 76.7794,
+            category: String(item.category || mode || 'rent').toLowerCase(),
+            type: item.type || item.propertyType || 'Room',
+            image: resolveImageUrl(rawImg),
+            images: item.images ? item.images.map((img: any) => typeof img === 'string' ? img : (img.uploadUrl || img.url)).filter(Boolean) : [],
+            location: item.address || item.location || `${item.city || ''}, ${item.state || ''}`.trim() || 'Chandigarh',
+            area: item.area || '',
+            isTrending: !!item.isTrending,
+            owner: item.owner || '',
+            phone: item.phone || '',
+            amenities: item.amenities || [],
+            furnished: item.furnished || '',
+            bhk: item.bhk || '',
+            gender: item.gender || ''
+          };
+        });
+        setDynamicRooms(mapped);
+        setViewportCounts(countsData);
+      }
+    } catch (error) {
+      console.error("Failed to fetch map posts:", error);
+    }
+  }, [mode, priceRange]);
 
   if (!mounted) {
     return <MapLoading message="Loading Interactive Map..." />;
@@ -398,14 +616,99 @@ export default function MapComponent({
         setMapCenter={handleSetMapCenter}
         bottomSheetOpen={bottomSheetOpen}
         closeBottomSheet={closeBottomSheet}
-        filteredRooms={filteredRooms}
+        filteredRooms={jitteredRooms}
         searchRadius={searchRadius}
         selectedRoom={selectedRoom}
         hoveredRoomId={hoveredRoomId}
         setHoveredRoomId={setHoveredRoomId}
         openBottomSheet={openBottomSheet}
         formatRentCompact={formatRentCompact}
+        onBoundsChange={handleBoundsChange}
       />
+
+      {/* Desktop Staying Insights Sidebar */}
+      {!isSelectingLocation && !isPostingRoom && viewportCounts && (isAreaView ? Object.keys(viewportCounts.areaWise).length > 0 : Object.keys(viewportCounts.cityWise).length > 0) && (
+        <div 
+          className="hidden md:flex flex-col gap-3 fixed top-20 left-4 w-72 max-h-[calc(100vh-120px)] rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] p-4 overflow-hidden z-[999] transition-all duration-300"
+          style={{
+            background: 'var(--glass-bg)',
+            backdropFilter: 'blur(24px)',
+          }}
+        >
+          <div className="flex items-center justify-between pb-2 border-b border-white/10 shrink-0">
+            <h3 className="text-xs font-black uppercase tracking-[0.15em] text-[var(--text-primary)]/85">
+              {isAreaView ? 'Sector Insights' : 'Staying Insights'}
+            </h3>
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-[var(--primary)]/10 text-[var(--primary)] rounded-full border border-[var(--primary)]/20 animate-pulse">
+              {viewportCounts.total} Active
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 py-1 custom-scrollbar scrollbar-none">
+            {Object.entries(isAreaView ? viewportCounts.areaWise : viewportCounts.cityWise)
+              .sort((a, b) => b[1] - a[1])
+              .map(([name, count]) => {
+                const cityName = isAreaView ? (() => {
+                  const match = dynamicRooms.find(r => r.area === name || (r.location && r.location.split(',')[0].trim() === name));
+                  return match ? ` (${match.city})` : '';
+                })() : '';
+                return (
+                  <button
+                    key={name}
+                    onClick={() => handleLocationClick(name, isAreaView ? 'area' : 'city')}
+                    className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white/50 dark:bg-white/5 border border-white/10 hover:border-[var(--primary)]/30 hover:bg-white dark:hover:bg-white/10 text-left transition-all active:scale-[0.98] group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center text-xs font-black group-hover:scale-110 transition-transform">
+                        📍
+                      </div>
+                      <span className="text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--primary)] transition-colors">
+                        {name}{cityName}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-black px-2 py-0.5 bg-black/5 dark:bg-white/10 rounded-lg text-[var(--text-primary)]/70 group-hover:bg-[var(--primary)] group-hover:text-white transition-all">
+                      {count} {count === 1 ? 'stay' : 'stays'}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Staying Insights Horizontal Pill Tray */}
+      {!isSelectingLocation && !isPostingRoom && viewportCounts && (isAreaView ? Object.keys(viewportCounts.areaWise).length > 0 : Object.keys(viewportCounts.cityWise).length > 0) && (
+        <div className="md:hidden fixed top-[138px] left-4 right-4 z-[999] pointer-events-none transition-all duration-300">
+          <div 
+            className="flex gap-2 overflow-x-auto py-2 px-3 rounded-2xl border border-white/20 dark:border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.08)] pointer-events-auto scrollbar-none"
+            style={{
+              background: 'var(--glass-bg)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
+            {Object.entries(isAreaView ? viewportCounts.areaWise : viewportCounts.cityWise)
+              .sort((a, b) => b[1] - a[1])
+              .map(([name, count]) => {
+                const cityName = isAreaView ? (() => {
+                  const match = dynamicRooms.find(r => r.area === name || (r.location && r.location.split(',')[0].trim() === name));
+                  return match ? ` (${match.city})` : '';
+                })() : '';
+                return (
+                  <button
+                    key={name}
+                    onClick={() => handleLocationClick(name, isAreaView ? 'area' : 'city')}
+                    className="flex items-center gap-1.5 shrink-0 px-3 py-1 rounded-full bg-white/50 dark:bg-white/5 border border-white/10 active:scale-95 transition-all text-xs font-bold text-[var(--text-primary)] hover:border-[var(--primary)]/30"
+                  >
+                    <span className="text-[10px]">📍</span>
+                    <span>{name}{cityName}</span>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 bg-[var(--primary)] text-white rounded-full animate-in zoom-in duration-300">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       <RoomsListModal
         isOpen={showRoomsList}
