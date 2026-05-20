@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { Room } from "@/lib/types";
-import { getRequest, postRequest } from "@/lib/apiCall";
+import { getRequest, postRequest, deleteRequest } from "@/lib/apiCall";
 import { resolveImageUrl } from "@/lib/hooks/useRooms";
 
 interface RoomDetailModalProps {
@@ -59,6 +59,7 @@ export default function RoomDetailModal({
 }: RoomDetailModalProps) {
   const [currentRoom, setCurrentRoom] = useState<Room | null>(initialRoom);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavoriteSubmitting, setIsFavoriteSubmitting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReasonId, setSelectedReasonId] = useState<string | null>(null);
@@ -74,6 +75,9 @@ export default function RoomDetailModal({
 
   useEffect(() => {
     setCurrentRoom(initialRoom);
+    if (initialRoom) {
+      setIsFavorited(!!initialRoom.isFavorite);
+    }
     if (initialRoom?.id) {
       const fetchFullDetails = async () => {
         setIsLoadingDetails(true);
@@ -113,8 +117,10 @@ export default function RoomDetailModal({
               furnished: item.furnished,
               bhk: item.bhk,
               gender: item.gender,
+              isFavorite: !!item.isFavorite,
             };
             setCurrentRoom(fullRoom);
+            setIsFavorited(!!item.isFavorite);
           }
         } catch (error) {
           console.error("Failed to fetch full room details:", error);
@@ -163,6 +169,25 @@ export default function RoomDetailModal({
   useEffect(() => {
     if (showReportModal) fetchReportTypes();
   }, [showReportModal]);
+
+  const handleToggleFavorite = async () => {
+    if (!currentRoom || isFavoriteSubmitting) return;
+
+    setIsFavoriteSubmitting(true);
+    try {
+      if (isFavorited) {
+        const res = await deleteRequest<{ success: boolean }>(`/post/removeFavorite/${currentRoom.id}`);
+        if (res?.success) setIsFavorited(false);
+      } else {
+        const res = await postRequest<{ success: boolean }>(`/post/addFavorite/${currentRoom.id}`);
+        if (res?.success) setIsFavorited(true);
+      }
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+    } finally {
+      setIsFavoriteSubmitting(false);
+    }
+  };
 
   const handleSubmitReport = async () => {
     if (!selectedReasonId || !currentRoom) return;
@@ -356,8 +381,9 @@ export default function RoomDetailModal({
               </h2>
             </div>
             <button
-              onClick={() => setIsFavorited(!isFavorited)}
-              className="p-1.5 rounded-full border border-gray-200 bg-white shadow-sm"
+              onClick={handleToggleFavorite}
+              disabled={isFavoriteSubmitting}
+              className="p-1.5 rounded-full border border-gray-200 bg-white shadow-sm disabled:opacity-50"
             >
               <Heart size={18} className={isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"} />
             </button>

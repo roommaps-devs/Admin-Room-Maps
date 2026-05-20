@@ -107,3 +107,31 @@ export async function uploadRequest<T = unknown>(
   }
   return responseData;
 }
+
+export async function deleteRequest<T = unknown>(
+  endpoint: string,
+): Promise<T> {
+  const token = retrieveToken();
+
+  const res = await fetch(`${baseURL}${endpoint}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    cache: "no-store",
+  });
+
+  let responseData;
+
+  try {
+    responseData = await res.json();
+  } catch {
+    responseData = null;
+  }
+
+  if (!res.ok) {
+    throw new Error(responseData?.message || "DELETE request failed");
+  }
+  return responseData;
+}
