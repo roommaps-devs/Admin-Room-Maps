@@ -69,6 +69,7 @@ export default function RoomDetailModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageList, setImageList] = useState<string[]>([]);
+  const url = process.env.NEXT_PUBLIC_IMAGE_URL!;
 
   useEffect(() => {
     setCurrentRoom(initialRoom);
@@ -160,6 +161,9 @@ export default function RoomDetailModal({
 
   if (!isOpen || !currentRoom) return null;
 
+
+  console.log(currentRoom , "currentRoom")
+
   return (
     <div
       className="fixed inset-0 z-[5000] flex items-end justify-center md:items-center p-3 bg-black/60 backdrop-blur-sm transition-all duration-300"
@@ -232,7 +236,7 @@ export default function RoomDetailModal({
           {imageList.length > 0 ? (
             <>
               <Image
-                src={imageList[currentImageIndex]}
+                src={url + imageList[currentImageIndex]}
                 alt={currentRoom.name}
                 fill
                 className="object-cover"
