@@ -12,6 +12,7 @@ export interface Room {
   images?: string[];
   isTrending?: boolean;
   location?: string;
+  area?: string;
   isTravelerFriendly?: boolean;
   rentType?: string;
   furnished?: string;

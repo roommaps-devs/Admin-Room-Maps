@@ -8,7 +8,7 @@ import MapMarkers from './MapMarkers';
 import { Layers, Plus, Minus } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store/store';
-import { setActiveTile } from '@/store/mapSlice';
+import { setActiveTile, setMapZoom } from '@/store/mapSlice';
 
 // Dynamically import Leaflet components to avoid SSR issues
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
@@ -31,6 +31,7 @@ interface MapViewProps {
   setHoveredRoomId: (id: string | null) => void;
   openBottomSheet: (room: any) => void;
   formatRentCompact: (amount: number) => string;
+  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }
 
 const TILE_LAYERS = [
@@ -44,6 +45,8 @@ function ChangeView({ center, liveUserPos, zoom, useFlyTo, onFlyToComplete }: { 
   const map = useMap();
   const onFlyToCompleteRef = useRef(onFlyToComplete);
   const isInitialMount = useRef(true);
+  const lastCenter = useRef<[number, number]>(center);
+  const lastZoom = useRef<number>(zoom);
 
   useEffect(() => {
     onFlyToCompleteRef.current = onFlyToComplete;
@@ -54,10 +57,29 @@ function ChangeView({ center, liveUserPos, zoom, useFlyTo, onFlyToComplete }: { 
     // Skip this to prevent Leaflet from trying to call setView/flyTo before it has fully initialized container size/positions.
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      lastCenter.current = center;
+      lastZoom.current = zoom;
       return;
     }
 
     if (!map) return;
+
+    const centerChanged = center[0] !== lastCenter.current[0] || center[1] !== lastCenter.current[1];
+    const zoomChanged = zoom !== lastZoom.current;
+
+    // Update refs immediately
+    lastCenter.current = center;
+    lastZoom.current = zoom;
+
+    // If nothing changed programmatically, do nothing
+    if (!centerChanged && !zoomChanged) {
+      return;
+    }
+
+    // If only zoom changed, but it matches the map's current zoom (user-initiated), skip
+    if (zoomChanged && zoom === map.getZoom() && !centerChanged) {
+      return;
+    }
 
     // Check if map is ready and has size (Leaflet's way of knowing if container exists and is laid out)
     const container = map.getContainer();
@@ -106,7 +128,37 @@ function ChangeView({ center, liveUserPos, zoom, useFlyTo, onFlyToComplete }: { 
   return null;
 }
 
-function MapEvents({ onLocationSelect, onMapMove, onMapClick }: { onLocationSelect?: (lat: number, lng: number) => void, onMapMove?: (lat: number, lng: number) => void, onMapClick?: () => void }) {
+function MapEvents({
+  onLocationSelect,
+  onMapMove,
+  onMapClick,
+  onBoundsChange,
+  onZoomEnd
+}: {
+  onLocationSelect?: (lat: number, lng: number) => void;
+  onMapMove?: (lat: number, lng: number) => void;
+  onMapClick?: () => void;
+  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
+  onZoomEnd?: (zoom: number) => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (onBoundsChange) {
+      try {
+        const bounds = map.getBounds();
+        onBoundsChange({
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest(),
+        });
+      } catch (e) {
+        console.warn("MapEvents initial getBounds error:", e);
+      }
+    }
+  }, [map, onBoundsChange]);
+
   useMapEvents({
     click(e) {
       if (onLocationSelect) {
@@ -116,8 +168,23 @@ function MapEvents({ onLocationSelect, onMapMove, onMapClick }: { onLocationSele
       }
     },
     moveend() {
-      if (onMapMove) {
-        // handled via setMapCenter
+      if (onBoundsChange) {
+        try {
+          const bounds = map.getBounds();
+          onBoundsChange({
+            north: bounds.getNorth(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            west: bounds.getWest(),
+          });
+        } catch (e) {
+          console.warn("MapEvents moveend getBounds error:", e);
+        }
+      }
+    },
+    zoomend() {
+      if (onZoomEnd) {
+        onZoomEnd(map.getZoom());
       }
     }
   });
@@ -165,7 +232,8 @@ const MapView: React.FC<MapViewProps> = (props) => {
     hoveredRoomId,
     setHoveredRoomId,
     openBottomSheet,
-    formatRentCompact
+    formatRentCompact,
+    onBoundsChange
   } = props;
 
   const dispatch = useDispatch();
@@ -235,6 +303,8 @@ const MapView: React.FC<MapViewProps> = (props) => {
             if (isSelectingLocation) setMapCenter([lat, lng]);
           }}
           onMapClick={() => bottomSheetOpen && closeBottomSheet()}
+          onBoundsChange={onBoundsChange}
+          onZoomEnd={(zoom) => dispatch(setMapZoom(zoom))}
         />
         <ChangeView center={searchCenter} liveUserPos={liveUserPos} zoom={mapZoom} useFlyTo={useFlyTo} onFlyToComplete={() => setUseFlyTo(false)} />
 

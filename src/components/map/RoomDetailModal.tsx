@@ -68,11 +68,62 @@ export default function RoomDetailModal({
   const [isLoadingTypes, setIsLoadingTypes] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [imageList, setImageList] = useState<string[]>([]);
   const url = process.env.NEXT_PUBLIC_IMAGE_URL!;
 
   useEffect(() => {
     setCurrentRoom(initialRoom);
+    if (initialRoom?.id) {
+      const fetchFullDetails = async () => {
+        setIsLoadingDetails(true);
+        try {
+          const res = await getRequest<{ success: boolean; data: any }>(
+            `/post/getById/${initialRoom.id}`
+          );
+          if (res?.success && res.data) {
+            const item = res.data;
+            const rawImg =
+              item.images?.[0]?.uploadUrl ||
+              item.images?.[0]?.url ||
+              (typeof item.images?.[0] === "string" ? item.images[0] : null) ||
+              item.image;
+            const fullRoom: Room = {
+              id: item.id || item.postId,
+              name: item.name || item.title || "Room Listing",
+              city: item.city || "Chandigarh",
+              rent: Number(item.rent) || 10000,
+              lat: Number(item.lat) || 30.7333,
+              lng: Number(item.lng) || 76.7794,
+              category: String(item.category || "rent").toLowerCase(),
+              type: item.type || item.propertyType || "Room",
+              image: resolveImageUrl(rawImg),
+              images: item.images
+                ? item.images
+                    .map((img: any) =>
+                      typeof img === "string" ? img : img.uploadUrl || img.url
+                    )
+                    .filter(Boolean)
+                : [],
+              location: item.address || item.location,
+              isTrending: !!item.isTrending,
+              owner: item.owner,
+              phone: item.phone,
+              amenities: item.amenities || [],
+              furnished: item.furnished,
+              bhk: item.bhk,
+              gender: item.gender,
+            };
+            setCurrentRoom(fullRoom);
+          }
+        } catch (error) {
+          console.error("Failed to fetch full room details:", error);
+        } finally {
+          setIsLoadingDetails(false);
+        }
+      };
+      fetchFullDetails();
+    }
   }, [initialRoom]);
 
   useEffect(() => {
@@ -404,13 +455,20 @@ export default function RoomDetailModal({
 
         {/* Fixed Footer - compact */}
         <div className="p-3 pt-2 pb-3 border-t border-gray-100 bg-white space-y-2">
-          <a
-            href={currentRoom.phone ? `tel:${currentRoom.phone}` : "tel:+919876543210"}
-            className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-black py-2.5 rounded-xl shadow-md transition-all active:scale-98 text-sm"
-          >
-            <Phone size={14} fill="currentColor" />
-            Call Owner
-          </a>
+          {isLoadingDetails && !currentRoom.phone ? (
+            <div className="w-full flex items-center justify-center gap-2 bg-orange-400 text-white font-black py-2.5 rounded-xl shadow-md text-sm animate-pulse">
+              <Loader2 className="animate-spin" size={14} />
+              Loading Contact Info...
+            </div>
+          ) : (
+            <a
+              href={currentRoom.phone ? `tel:${currentRoom.phone}` : "tel:+919876543210"}
+              className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-black py-2.5 rounded-xl shadow-md transition-all active:scale-98 text-sm"
+            >
+              <Phone size={14} fill="currentColor" />
+              Call Owner
+            </a>
+          )}
           <div className="flex gap-2">
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${currentRoom.lat},${currentRoom.lng}`}
