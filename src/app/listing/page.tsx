@@ -1,164 +1,522 @@
-"use client";
 
-import React, { useMemo, useState } from 'react';
-import { useRooms, resolveImageUrl } from '@/lib/hooks/useRooms';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
-import Image from 'next/image';
-import Link from 'next/link';
-import { MapPin, IndianRupee, Star, ShieldCheck, Search, Home } from 'lucide-react';
 
-const url = process.env.NEXT_PUBLIC_IMAGE_URL!;
+"use client"
 
-interface RoomCardImageProps {
-  src: string;
-  alt: string;
+import { getRequest } from "@/lib/apiCall"
+import { useEffect, useState } from "react"
+
+import {
+  Phone,
+  MapPin,
+  User,
+  Heart,
+  BadgeIndianRupee,
+  ChevronDown,
+} from "lucide-react"
+
+import ImageSlider from "@/components/ImageSlider"
+import PropertyFilters from "@/components/PropertyFilters"
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+export interface PostImage {
+  id?: string
+  url: string
 }
 
-function RoomCardImage({ src, alt }: RoomCardImageProps) {
-  const [error, setError] = useState(false);
-
-  if (error || !src) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-[#FAFAF8] border border-[#0A0A0A]/5">
-        <Home size={40} className="text-[#0A0A0A]/20" />
-        <span className="text-[10px] font-bold text-[#0A0A0A]/40 uppercase tracking-wider mt-2">No Image</span>
-      </div>
-    );
-  }
-
-  return (
-    <Image
-      src={src}
-      alt={alt}
-      width={500}
-      height={500}
-      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-      onError={() => setError(true)}
-    />
-  );
+export interface Post {
+  id: string
+  name: string
+  type: string
+  rent: number
+  owner: string
+  phone: string
+  furnished: string
+  city: string
+  state: string
+  bhk: string
+  gender: string
+  isTrending: boolean
+  availabilityStatus: string
+  images: PostImage[]
 }
 
-export default function ListingPage() {
-  const { data: rooms, isLoading } = useRooms();
-  const { mode } = useSelector((state: RootState) => state.ui);
-  
-  const filteredRooms = useMemo(() => {
-    return rooms.filter(room => (room.category || 'rent') === mode);
-  }, [rooms, mode]);
+export interface ApiResponse<T> {
+  success: boolean
+  statusCode: number
+  message: string
+  data: {
+    posts: T
+    totalPost: number
+    totalPages: number
+    currentPage: number
+    pageLimit: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }
+}
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF8]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-[var(--primary)]/20 border-t-[var(--primary)] rounded-full animate-spin" />
-          <p className="text-[var(--text-primary)]/40 font-bold tracking-widest uppercase text-xs">Finding Stays...</p>
+/* =========================================================
+   SKELETON LOADER CARD
+========================================================= */
+
+const SkeletonCard = () => (
+  <div className="bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden shadow-sm border border-neutral-200 p-4 sm:p-5 flex flex-col h-full">
+    {/* Image Skeleton */}
+    <div className="w-full h-[220px] sm:h-[250px] lg:h-[280px] bg-neutral-100 animate-pulse rounded-2xl mb-4" />
+    
+    {/* Title & Badge */}
+    <div className="flex justify-between items-start gap-4 mb-3">
+      <div className="w-2/3">
+        <div className="h-6 bg-neutral-100 animate-pulse rounded-lg w-full mb-2" />
+        <div className="h-4 bg-neutral-100 animate-pulse rounded-lg w-3/4" />
+      </div>
+      <div className="w-16 h-6 bg-neutral-100 animate-pulse rounded-full animate-pulse" />
+    </div>
+
+    {/* Tags */}
+    <div className="flex gap-2 my-4 flex-wrap">
+      <div className="w-16 h-6 bg-neutral-100 animate-pulse rounded-full" />
+      <div className="w-16 h-6 bg-neutral-100 animate-pulse rounded-full" />
+      <div className="w-16 h-6 bg-neutral-100 animate-pulse rounded-full" />
+    </div>
+
+    {/* Location */}
+    <div className="h-4 bg-neutral-100 animate-pulse rounded-lg w-1/2 mb-5" />
+
+    {/* Footer */}
+    <div className="flex items-center justify-between pt-5 border-t border-neutral-100 mt-auto">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-neutral-100 animate-pulse" />
+        <div>
+          <div className="h-3 bg-neutral-100 animate-pulse rounded-md w-16 mb-1.5" />
+          <div className="h-4 bg-neutral-100 animate-pulse rounded-md w-24" />
         </div>
       </div>
-    );
+      <div className="w-24 h-10 bg-neutral-100 animate-pulse rounded-2xl" />
+    </div>
+  </div>
+)
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+const ListingPage = () => {
+
+  /* =====================================================
+     STATES
+  ===================================================== */
+
+  const [allPost, setAllPost] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+
+  const [filters, setFilters] = useState({
+    state: "",
+    stateCode: "",
+    city: "",
+    bhk: "",
+    furnished: "",
+    gender: "",
+    minPrice: "",
+    maxPrice: "",
+  })
+
+  /* =====================================================
+     FETCH POSTS
+  ===================================================== */
+
+  const getAllPost = async () => {
+    try {
+
+      setLoading(true)
+
+      const params = new URLSearchParams()
+
+      /* FILTERS */
+
+      if (filters.state)
+        params.append("state", filters.state)
+
+      if (filters.city)
+        params.append("city", filters.city)
+
+      if (filters.bhk)
+        params.append("bhk", filters.bhk)
+
+      if (filters.gender)
+        params.append("gender", filters.gender)
+
+      if (filters.furnished)
+        params.append("furnished", filters.furnished)
+
+      if (filters.minPrice)
+        params.append("minPrice", filters.minPrice)
+
+      if (filters.maxPrice)
+        params.append("maxPrice", filters.maxPrice)
+
+      /* PAGINATION */
+
+      params.append("page", currentPage.toString())
+      params.append("limit", "9")
+
+      const res = await getRequest(
+        `/post/getAll?${params.toString()}`
+      ) as ApiResponse<Post[]>
+
+      if (res?.success) {
+
+        setAllPost(res.data.posts)
+
+        setTotalPages(res.data.totalPages)
+      }
+
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-console.log(url , "ursssl")  
+  /* =====================================================
+     EFFECT
+  ===================================================== */
+
+  useEffect(() => {
+    getAllPost()
+  }, [filters, currentPage])
+
+  /* =====================================================
+     FORMAT RENT
+  ===================================================== */
+
+  const formatRent = (rent: number) => {
+    return new Intl.NumberFormat("en-IN").format(rent)
+  }
+
+  /* =====================================================
+     JSX
+  ===================================================== */
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8] pt-28 pb-20 px-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-sans font-black text-[#0A0A0A] mb-4 tracking-tight">
-              {mode === 'travelers' ? 'Daily Stays' : 'Available Rooms'}
-            </h1>
-            <p className="text-[#6B6B6B] font-medium">
-              Showing {filteredRooms.length} verified listings across India
-            </p>
-          </div>
-          <Link 
-            href="/map" 
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#0A0A0A] text-white rounded-2xl font-bold text-sm hover:scale-105 transition-all active:scale-95 shadow-xl"
-          >
-            <Search size={16} />
-            View on Map
-          </Link>
-        </div>
+    <div className="min-h-screen bg-[#fafafa] px-3 py-4 sm:px-5 sm:py-5 lg:px-8 xl:px-10">
 
-        {/* Grid */}
-        {filteredRooms.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {filteredRooms.map((room) => (
-              <Link 
-                key={room.id} 
-                href={`/map?id=${room.id}`}
-                className="group flex flex-col bg-white rounded-[32px] overflow-hidden border border-[#0A0A0A]/5 hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] hover:-translate-y-2 transition-all duration-500"
-              >
-                <div className="relative h-64 overflow-hidden">
-                
+      {/* MAIN LAYOUT */}
+      <div className="flex flex-col xl:flex-row gap-5 lg:gap-6">
 
-                  {room?.images && room?.images?.length > 0 ? (
-                    room?.images?.map((img, index) => (
-                      <RoomCardImage
-                        key={`${img}-${index}`}
-                        src={`${url}${img}`}
-                        alt={room?.name}
-                      />
-                    ))
-                  ) : room?.image ? (
-                    <RoomCardImage
-                      src={room.image}
-                      alt={room?.name}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-[#FAFAF8] border border-[#0A0A0A]/5">
-                      <Home size={40} className="text-[#0A0A0A]/20" />
-                      <span className="text-[10px] font-bold text-[#0A0A0A]/40 uppercase tracking-wider mt-2">No Image</span>
-                    </div>
-                  )}
+        {/* ===================================================
+            FILTER SIDEBAR
+        =================================================== */}
 
+        <aside className="w-full xl:w-[320px] 2xl:w-[350px] shrink-0">
 
+          {/* MOBILE FILTER */}
+          <div className="xl:hidden">
 
-                  <div className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur-md rounded-xl text-xs font-black text-[#0A0A0A] shadow-sm flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-[#22c55e]" />
-                    VERIFIED
-                  </div>
-                  {room.isTrending && (
-                    <div className="absolute top-4 right-4 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center text-[#0A0A0A] shadow-lg animate-bounce">
-                      <Star size={18} fill="currentColor" />
-                    </div>
-                  )}
-                  <div className="absolute bottom-4 left-4 px-4 py-2 bg-[#FF5733] text-white rounded-xl text-sm font-black shadow-lg">
-                    ₹{room.rent.toLocaleString('en-IN')}/{mode === 'travelers' ? 'day' : 'mo'}
-                  </div>
+            <details className="bg-white rounded-[28px] shadow-sm border border-neutral-200 overflow-hidden">
+
+              <summary className="list-none cursor-pointer flex items-center justify-between px-5 py-4">
+
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black text-neutral-900">
+                    Filters
+                  </h2>
+
+                  <p className="text-sm text-neutral-500 mt-1">
+                    Refine your search
+                  </p>
                 </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-2 text-[#6B6B6B] text-[10px] font-black uppercase tracking-widest mb-2">
-                    <MapPin size={12} />
-                    {room.city}
-                  </div>
-                  <h3 className="text-xl font-bold text-[#0A0A0A] mb-4 line-clamp-1 group-hover:text-[#FF5733] transition-colors">{room.name}</h3>
-                  <div className="flex items-center justify-between pt-4 border-t border-[#0A0A0A]/5">
-                    <span className="text-xs font-bold text-[#6B6B6B] uppercase tracking-tighter">{room.type || 'Standard'} Room</span>
-                    <span className="text-[10px] font-black text-[#FF5733] uppercase tracking-[0.2em]">View Details</span>
-                  </div>
+
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                  <ChevronDown className="w-5 h-5 text-orange-500" />
                 </div>
-              </Link>
-            ))}
+              </summary>
+
+              <div className="p-4 sm:p-5 border-t border-neutral-100">
+
+                <PropertyFilters
+                  filters={filters}
+                  setFilters={setFilters}
+                />
+              </div>
+            </details>
           </div>
-        ) : (
-          <div className="py-20 text-center">
-            <div className="w-20 h-20 bg-[#0A0A0A]/5 rounded-full flex items-center justify-center mx-auto mb-6 text-[#0A0A0A]/20">
-              <Search size={32} />
+
+          {/* DESKTOP FILTER */}
+          <div className="hidden xl:block sticky top-24">
+
+            <PropertyFilters
+              filters={filters}
+              setFilters={setFilters}
+            />
+          </div>
+        </aside>
+
+        {/* ===================================================
+            RIGHT CONTENT
+        =================================================== */}
+
+        <main className="flex-1 min-w-0">
+
+          {/* =================================================
+              HEADER
+          ================================================= */}
+
+          <div className="mb-6 sm:mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+            <div>
+              <h1 className="text-2xl sm:text-3xl xl:text-4xl font-black text-neutral-900 leading-tight">
+                Explore Properties
+              </h1>
+
+              <p className="text-sm sm:text-base text-neutral-500 mt-1">
+                Find your perfect stay near you
+              </p>
             </div>
-            <h3 className="text-2xl font-bold text-[#0A0A0A] mb-2">No listings found</h3>
-            <p className="text-[#6B6B6B] mb-8">We couldn't find any rooms matching your current criteria.</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-8 py-3 bg-[#0A0A0A] text-white rounded-full font-bold text-sm"
-            >
-              Reset Filters
-            </button>
+
+            <div className="bg-white border border-neutral-200 px-4 py-2 rounded-2xl shadow-sm w-fit">
+              <span className="text-sm font-semibold text-neutral-700">
+                {allPost.length} Listings
+              </span>
+            </div>
           </div>
-        )}
+
+          {/* =================================================
+              GRID
+          ================================================= */}
+
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-5 sm:gap-6 lg:gap-7">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <SkeletonCard key={index} />
+              ))}
+            </div>
+          ) : allPost.length === 0 ? (
+            <div className="bg-white border border-neutral-200 rounded-[28px] p-10 text-center">
+              <h2 className="text-2xl font-black text-neutral-900">
+                No Property Found
+              </h2>
+              <p className="text-neutral-500 mt-2">
+                Try changing your filters
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-5 sm:gap-6 lg:gap-7">
+
+                {allPost.map((post) => (
+
+                  <div
+                    key={post.id}
+                    className="group bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden shadow-sm border border-neutral-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+                  >
+
+                    {/* =========================================
+                        IMAGE
+                    ========================================= */}
+
+                    <div className="relative">
+
+                      <ImageSlider
+                        images={post.images}
+                        alt={post.name}
+                        className="h-[220px] sm:h-[250px] lg:h-[280px]"
+                      />
+
+                      {/* BADGES */}
+                      <div className="absolute top-3 left-3 flex flex-wrap gap-2 z-20">
+
+                        <span className="bg-white/90 backdrop-blur-md text-black text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full shadow">
+                          {post.type}
+                        </span>
+
+                        {post.isTrending && (
+                          <span className="bg-orange-500 text-white text-[10px] sm:text-xs font-bold px-3 py-1 rounded-full shadow">
+                            🔥 Trending
+                          </span>
+                        )}
+                      </div>
+
+                      {/* HEART */}
+                      <button className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur-md p-2 rounded-full shadow hover:scale-110 transition-all">
+                        <Heart className="w-4 h-4 text-red-500" />
+                      </button>
+
+                      {/* PRICE */}
+                      <div className="absolute bottom-3 left-3 z-20 bg-white/95 backdrop-blur-md px-3 sm:px-4 py-2 rounded-2xl shadow-xl">
+
+                        <div className="flex items-center gap-1">
+
+                          <BadgeIndianRupee className="w-4 h-4 text-orange-500" />
+
+                          <span className="font-black text-base sm:text-lg text-neutral-900">
+                            {formatRent(post.rent)}
+                          </span>
+
+                          <span className="text-[10px] sm:text-xs text-neutral-500">
+                            /month
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* =========================================
+                        BODY
+                    ========================================= */}
+
+                    <div className="p-4 sm:p-5">
+
+                      {/* TITLE */}
+                      <div className="flex items-start justify-between gap-3">
+
+                        <div className="min-w-0">
+
+                          <h2 className="text-lg sm:text-xl font-extrabold text-neutral-900 leading-tight line-clamp-1">
+                            {post.bhk} {post.type}
+                          </h2>
+
+                          <p className="text-xs sm:text-sm text-neutral-500 mt-1 line-clamp-1">
+                            {post.name}
+                          </p>
+                        </div>
+
+                        <div
+                          className={`px-2.5 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold whitespace-nowrap ${
+                            post.availabilityStatus === "Available"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {post.availabilityStatus}
+                        </div>
+                      </div>
+
+                      {/* TAGS */}
+                      <div className="flex flex-wrap gap-2 mt-4">
+
+                        <span className="px-3 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-orange-100 text-orange-600">
+                          {post.furnished}
+                        </span>
+
+                        <span className="px-3 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-blue-100 text-blue-600">
+                          {post.gender}
+                        </span>
+
+                        <span className="px-3 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-purple-100 text-purple-600">
+                          {post.city}
+                        </span>
+                      </div>
+
+                      {/* LOCATION */}
+                      <div className="flex items-center gap-2 mt-5 text-neutral-500">
+
+                        <MapPin className="w-4 h-4 shrink-0" />
+
+                        <span className="text-xs sm:text-sm line-clamp-1">
+                          {post.city}, {post.state}
+                        </span>
+                      </div>
+
+                      {/* FOOTER */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-5 pt-5 border-t border-neutral-100">
+
+                        {/* OWNER */}
+                        <div className="flex items-center gap-3 min-w-0">
+
+                          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white flex items-center justify-center shadow-lg shrink-0">
+                            <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+
+                          <div className="min-w-0">
+
+                            <p className="text-[10px] sm:text-xs text-neutral-400 font-medium">
+                              Property Owner
+                            </p>
+
+                            <p className="font-bold text-sm sm:text-base text-neutral-800 capitalize truncate">
+                              {post.owner}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* CALL BUTTON */}
+                        <a
+                          href={`tel:${post.phone}`}
+                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg transition-all"
+                        >
+                          <Phone className="w-4 h-4" />
+                          Call Now
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ===============================================
+                  PAGINATION
+              =============================================== */}
+
+              <div className="flex items-center justify-center gap-3 mt-10 flex-wrap">
+
+                {/* PREVIOUS */}
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() =>
+                    setCurrentPage((prev) => prev - 1)
+                  }
+                  className={`px-5 py-3 rounded-2xl font-bold transition-all ${
+                    currentPage === 1
+                      ? "bg-neutral-200 text-neutral-400 cursor-not-allowed"
+                      : "bg-orange-500 text-white hover:bg-orange-600"
+                  }`}
+                >
+                  Previous
+                </button>
+
+                {/* PAGE NUMBERS */}
+                {Array.from({ length: totalPages }).map((_, index) => (
+
+                  <button
+                    key={index}
+                    onClick={() => setCurrentPage(index + 1)}
+                    className={`w-12 h-12 rounded-2xl font-bold transition-all ${
+                      currentPage === index + 1
+                        ? "bg-orange-500 text-white"
+                        : "bg-white border border-neutral-200 text-neutral-700 hover:bg-orange-50"
+                    }`}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+
+                {/* NEXT */}
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() =>
+                    setCurrentPage((prev) => prev + 1)
+                  }
+                  className={`px-5 py-3 rounded-2xl font-bold transition-all ${
+                    currentPage === totalPages
+                      ? "bg-neutral-200 text-neutral-400 cursor-not-allowed"
+                      : "bg-orange-500 text-white hover:bg-orange-600"
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
+        </main>
       </div>
     </div>
-  );
+  )
 }
+
+export default ListingPage

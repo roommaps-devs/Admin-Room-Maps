@@ -34,16 +34,45 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* <body className="min-h-full flex flex-col">
         <StoreProvider>
           <Header />
+          
           <main className="flex-1">{children}</main>
           <Footer />
           <BottomNav />
           <Toaster />
         </StoreProvider>
         <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />
-      </body>
+      </body> */}
+
+      <body className="min-h-screen flex flex-col">
+  <StoreProvider>
+
+    {/* Header */}
+    <Header />
+
+    {/* Main Content */}
+    <main className="flex-1 pt-[80px]">
+      {children}
+    </main>
+
+    {/* Footer */}
+    <Footer />
+
+    {/* Mobile Bottom Nav */}
+    <BottomNav />
+
+    {/* Toast */}
+    <Toaster />
+
+  </StoreProvider>
+
+  <Script
+    src="https://accounts.google.com/gsi/client"
+    strategy="beforeInteractive"
+  />
+</body>
     </html>
   );
 }

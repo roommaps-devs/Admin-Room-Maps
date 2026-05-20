@@ -2,6 +2,7 @@ export interface Room {
   id: string;
   name: string;
   city: string;
+  state?: string;
   rent: number;
   lat: number;
   lng: number;

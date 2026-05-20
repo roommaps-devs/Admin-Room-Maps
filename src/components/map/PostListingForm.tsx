@@ -214,12 +214,14 @@ export default function PostListingForm({
 
       if (filesToUpload.length > 0) {
         const formData = new FormData();
-        for (const file of filesToUpload) {
-          if (file instanceof File) {
-            formData.append('media', file);
+        filesToUpload.forEach((file, index) => {
+          if (file instanceof Blob || file instanceof File) {
+            console.log('file =>', file);
+            const filename = (file as any).name || `image-${index}.jpg`;
+            formData.append('media', file, filename);
           }
-        }
-        
+        });
+        console.log('Form data =>',formData);
         try {
           const res = await uploadRequest<{
             success: boolean;
@@ -279,6 +281,8 @@ export default function PostListingForm({
       };
 
       const roomId = await addRoomMutation.mutateAsync(roomData as any);
+
+      console.log("roomiqqqqd",roomId);  
 
       ResponseMessage({
         success: true,
