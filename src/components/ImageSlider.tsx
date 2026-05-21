@@ -23,11 +23,13 @@ const ImageSlider = ({
 
   const FULL_URL = process.env.NEXT_PUBLIC_IMAGE_URL || ""
 
-  const nextImage = () => {
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
     setCurrentIndex((prev) => (prev + 1) % images.length)
   }
 
-  const prevImage = () => {
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
     setCurrentIndex(
       (prev) => (prev - 1 + images.length) % images.length
     )

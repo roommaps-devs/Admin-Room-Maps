@@ -2,7 +2,7 @@ import Hero from "@/components/Hero";
 import FAQ from "@/components/FAQ";
 import { Search, MapPin, Star, Shield } from "lucide-react";
 import { Metadata } from "next";
-
+import ArticlesSection from "@/components/ArticlesSection";
 export const metadata: Metadata = {
   title: "RoomMaps | Find Rooms & Stays Across India — Zero Brokerage",
   description:
@@ -125,6 +125,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Articles & Guides Section */}
+      <ArticlesSection />
 
       {/* FAQ Section */}
       <FAQ />

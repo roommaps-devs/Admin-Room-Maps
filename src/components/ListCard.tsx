@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import ImageSlider from "@/components/ImageSlider"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Post } from "@/app/listing/page"
 import { postRequest, deleteRequest } from "@/lib/apiCall"
 
@@ -18,6 +19,7 @@ interface ListCardProps {
 }
 
 const ListCard = ({ post }: ListCardProps) => {
+  const router = useRouter();
   const [isFavorited, setIsFavorited] = useState(post.isFavorite || false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,8 +52,15 @@ const ListCard = ({ post }: ListCardProps) => {
     }
   };
 
+  const handleCardClick = () => {
+    router.push(`/map?id=${post.id}`);
+  };
+
   return (
-    <div className="group bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden shadow-sm border border-neutral-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+    <div 
+      onClick={handleCardClick}
+      className="group bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden shadow-sm border border-neutral-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+    >
       {/* =========================================
           IMAGE
       ========================================= */}
@@ -165,6 +174,7 @@ const ListCard = ({ post }: ListCardProps) => {
           {/* CALL BUTTON */}
           <Link
             href={`tel:${post.phone}`}
+            onClick={(e) => e.stopPropagation()}
             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg transition-all"
           >
             <Phone className="w-4 h-4" />
