@@ -27,6 +27,7 @@ export default function PostPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-primary)]">
+      
 
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 md:py-12">
