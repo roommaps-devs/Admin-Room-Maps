@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Sparkles,
   Building2,
+  Calendar,
 } from "lucide-react";
 import Image from "next/image";
 import { Room } from "@/lib/types";
@@ -83,6 +84,49 @@ export default function RoomDetailModal({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [imageList, setImageList] = useState<string[]>([]);
   const url = process.env.NEXT_PUBLIC_IMAGE_URL!;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const formatDate = (dateInput?: string | Date) => {
+    if (!dateInput) return "";
+    try {
+      const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+      if (isNaN(date.getTime())) return "";
+
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      if (diffMs < 0) {
+        return "Just now";
+      }
+
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMins < 1) {
+        return "Just now";
+      } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+      } else if (diffDays === 1) {
+        return "Yesterday";
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+    } catch (e) {
+      return "";
+    }
+  };
 
   useEffect(() => {
     setCurrentRoom(initialRoom);
@@ -130,6 +174,7 @@ export default function RoomDetailModal({
               isFavorite: !!item.isFavorite,
               userId: item.userId || item.user?.id || initialRoom?.userId,
               createdByEmail: item.createdByEmail || initialRoom?.createdByEmail,
+              createdAt: item.createdAt || initialRoom?.createdAt,
             };
             setCurrentRoom(fullRoom);
             setIsFavorited(!!item.isFavorite);
@@ -397,10 +442,20 @@ export default function RoomDetailModal({
           {/* Title & Favorite */}
           <div className="flex justify-between items-start gap-2">
             <div>
-              <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">
-                {currentRoom.category?.toUpperCase() || "RENT"}
-              </span>
-              <h2 className="text-xl font-bold text-gray-900 leading-tight">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider">
+                  {currentRoom.category?.toUpperCase() || "RENT"}
+                </span>
+                {mounted && currentRoom.createdAt && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-neutral-300" />
+                    <span className="text-[10px] font-bold text-neutral-400">
+                      Posted {formatDate(currentRoom.createdAt)}
+                    </span>
+                  </>
+                )}
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 leading-tight mt-0.5">
                 {currentRoom.name || currentRoom.type}
               </h2>
             </div>

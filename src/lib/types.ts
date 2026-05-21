@@ -24,6 +24,7 @@ export interface Room {
   isFavorite?: boolean;
   userId?: string;
   createdByEmail?: string;
+  createdAt?: string;
 }
 
 export interface User {

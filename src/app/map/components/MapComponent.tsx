@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { clearUser } from '@/store/userSlice';
+import { deleteCookie } from "cookies-next";
 import { useRouter } from 'next/navigation';
 import {
   LogOut, Crosshair
@@ -73,7 +74,13 @@ export default function MapComponent({
 }) {
   const dispatch = useDispatch();
   const { user } = useSelector((state: RootState) => state.user);
-  const logout = () => dispatch(clearUser());
+  const logout = () => {
+    deleteCookie("drive_access_token");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("pwa_access_token");
+    }
+    dispatch(clearUser());
+  };
   const router = useRouter();
 
   // Redux state

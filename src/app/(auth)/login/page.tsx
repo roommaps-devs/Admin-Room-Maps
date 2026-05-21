@@ -90,6 +90,17 @@ function LoginContent() {
       try {
         const res = await postRequest<ApiResponse<any>>("/auth/verify", { accessToken: token });
         setCookie("drive_access_token", token, { path: '/' });
+
+        // Save token to persistent localStorage if in PWA mode
+        const isPwa = typeof window !== "undefined" && (
+          window.matchMedia('(display-mode: standalone)').matches || 
+          (window.navigator as any).standalone === true ||
+          document.referrer.includes('android-app://')
+        );
+        if (isPwa && typeof window !== "undefined") {
+          localStorage.setItem("pwa_access_token", token);
+        }
+
         if (res.success) {
           dispatch(setUser(res.data?.user || res.data || userData));
           const redirect = searchParams.get("redirect");

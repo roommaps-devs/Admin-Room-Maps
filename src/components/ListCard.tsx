@@ -8,6 +8,7 @@ import {
   Heart,
   BadgeIndianRupee,
   ChevronDown,
+  Calendar,
 } from "lucide-react"
 import ImageSlider from "@/components/ImageSlider"
 import Link from "next/link"
@@ -31,14 +32,54 @@ const ListCard = ({ post, onFavoriteToggle }: ListCardProps) => {
   );
   const [isFavorited, setIsFavorited] = useState(post.isFavorite || false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     setIsFavorited(post.isFavorite || false);
   }, [post.isFavorite]);
 
   const formatRent = (rent: number) => {
     return new Intl.NumberFormat("en-IN").format(rent)
   }
+
+  const formatDate = (dateInput?: string | Date) => {
+    if (!dateInput) return "";
+    try {
+      const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+      if (isNaN(date.getTime())) return "";
+
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      if (diffMs < 0) {
+        return "Just now";
+      }
+
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMins < 1) {
+        return "Just now";
+      } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+      } else if (diffDays === 1) {
+        return "Yesterday";
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+    } catch (e) {
+      return "";
+    }
+  };
 
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -169,25 +210,34 @@ const ListCard = ({ post, onFavoriteToggle }: ListCardProps) => {
           </span>
         </div>
 
-        {/* LOCATION */}
-        <a
-          href={
-            post.lat && post.lng
-              ? `https://www.google.com/maps/search/?api=1&query=${post.lat},${post.lng}`
-              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  `${post.name}, ${post.city}, ${post.state || ""}`
-                )}`
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="flex items-center gap-2 mt-5 text-neutral-500 hover:text-orange-500 transition-colors w-fit group/loc"
-        >
-          <MapPin className="w-4 h-4 shrink-0 text-neutral-400 group-hover/loc:text-orange-500 transition-colors" />
-          <span className="text-xs sm:text-sm line-clamp-1 underline decoration-dotted underline-offset-2">
-            {post.city}, {post.state}
-          </span>
-        </a>
+        {/* LOCATION & POST DATE */}
+        <div className="flex items-center justify-between mt-5 gap-3">
+          <a
+            href={
+              post.lat && post.lng
+                ? `https://www.google.com/maps/search/?api=1&query=${post.lat},${post.lng}`
+                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    `${post.name}, ${post.city}, ${post.state || ""}`
+                  )}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-2 text-neutral-500 hover:text-orange-500 transition-colors min-w-0 group/loc"
+          >
+            <MapPin className="w-4 h-4 shrink-0 text-neutral-400 group-hover/loc:text-orange-500 transition-colors" />
+            <span className="text-xs sm:text-sm line-clamp-1 underline decoration-dotted underline-offset-2">
+              {post.city}, {post.state}
+            </span>
+          </a>
+
+          {mounted && post.createdAt && (
+            <div className="flex items-center gap-1.5 text-neutral-400 text-xs shrink-0 font-medium bg-neutral-50 px-2.5 py-1 rounded-full border border-neutral-100/80 shadow-sm">
+              <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+              <span>{formatDate(post.createdAt)}</span>
+            </div>
+          )}
+        </div>
 
         {/* FOOTER */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-5 pt-5 border-t border-neutral-100">

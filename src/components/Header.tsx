@@ -19,6 +19,9 @@ export default function Header() {
 
   const handleLogout = () => {
     deleteCookie("drive_access_token");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("pwa_access_token");
+    }
     dispatch(clearUser());
     dispatch(setProfileMenu(false));
     router.push("/login");

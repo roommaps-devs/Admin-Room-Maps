@@ -41,6 +41,7 @@ export interface Post {
   createdByEmail?: string
   lat?: number
   lng?: number
+  createdAt?: string
 }
 
 export interface ApiResponse<T> {
