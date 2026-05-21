@@ -76,9 +76,6 @@ export default function MapComponent({
   const { user } = useSelector((state: RootState) => state.user);
   const logout = () => {
     deleteCookie("drive_access_token");
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("pwa_access_token");
-    }
     dispatch(clearUser());
   };
   const router = useRouter();

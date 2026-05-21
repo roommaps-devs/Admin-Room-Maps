@@ -114,16 +114,6 @@ export default function GoogleLogin() {
           const verifyRes = await postRequest<ApiResponse<any>>("/auth/verify", { accessToken });
           setCookie("drive_access_token", accessToken, { path: '/' });
 
-          // Save token to persistent localStorage if in PWA mode
-          const isPwa = typeof window !== "undefined" && (
-            window.matchMedia('(display-mode: standalone)').matches || 
-            (window.navigator as any).standalone === true ||
-            document.referrer.includes('android-app://')
-          );
-          if (isPwa && typeof window !== "undefined") {
-            localStorage.setItem("pwa_access_token", accessToken);
-          }
-
           if (verifyRes.success) {
             dispatch(setUser(verifyRes.data?.user || verifyRes.data || data.data?.user));
             const redirect = searchParams.get("redirect");
