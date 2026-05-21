@@ -32,6 +32,7 @@ interface MapViewProps {
   openBottomSheet: (room: any) => void;
   formatRentCompact: (amount: number) => string;
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
+  setIsDragging?: (dragging: boolean) => void;
 }
 
 const TILE_LAYERS = [
@@ -133,13 +134,15 @@ function MapEvents({
   onMapMove,
   onMapClick,
   onBoundsChange,
-  onZoomEnd
+  onZoomEnd,
+  setIsDragging
 }: {
   onLocationSelect?: (lat: number, lng: number) => void;
   onMapMove?: (lat: number, lng: number) => void;
   onMapClick?: () => void;
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
   onZoomEnd?: (zoom: number) => void;
+  setIsDragging?: (dragging: boolean) => void;
 }) {
   const map = useMap();
 
@@ -167,7 +170,23 @@ function MapEvents({
         onMapClick();
       }
     },
+    dragstart() {
+      if (setIsDragging) setIsDragging(true);
+    },
+    dragend() {
+      if (setIsDragging) setIsDragging(false);
+    },
+    move() {
+      if (onMapMove) {
+        const center = map.getCenter();
+        onMapMove(center.lat, center.lng);
+      }
+    },
     moveend() {
+      if (onMapMove) {
+        const center = map.getCenter();
+        onMapMove(center.lat, center.lng);
+      }
       if (onBoundsChange) {
         try {
           const bounds = map.getBounds();
@@ -233,7 +252,8 @@ const MapView: React.FC<MapViewProps> = (props) => {
     setHoveredRoomId,
     openBottomSheet,
     formatRentCompact,
-    onBoundsChange
+    onBoundsChange,
+    setIsDragging
   } = props;
 
   const dispatch = useDispatch();
@@ -305,6 +325,7 @@ const MapView: React.FC<MapViewProps> = (props) => {
           onMapClick={() => bottomSheetOpen && closeBottomSheet()}
           onBoundsChange={onBoundsChange}
           onZoomEnd={(zoom) => dispatch(setMapZoom(zoom))}
+          setIsDragging={setIsDragging}
         />
         <ChangeView center={searchCenter} liveUserPos={liveUserPos} zoom={mapZoom} useFlyTo={useFlyTo} onFlyToComplete={() => setUseFlyTo(false)} />
 

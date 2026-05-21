@@ -12,6 +12,8 @@ interface LocationPickerProps {
   setSearchCenter: (center: [number, number]) => void;
   reverseGeocode: (lat: number, lon: number) => void;
   playClickSound: () => void;
+  onConfirmLocation?: (coords: [number, number]) => void;
+  isDragging?: boolean;
 }
 
 const LocationPicker: React.FC<LocationPickerProps> = ({
@@ -22,23 +24,59 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   setIsPostingRoom,
   setSearchCenter,
   reverseGeocode,
-  playClickSound
+  playClickSound,
+  onConfirmLocation,
+  isDragging = false
 }) => {
   if (!isActive) return null;
 
   return (
     <div className="fixed inset-0 z-[5000] pointer-events-none flex flex-col items-center justify-center">
-      {/* Crosshair */}
-      <div className="relative flex items-center justify-center">
-        {/* Outer pulsing ring */}
-        <div className="absolute w-16 h-16 rounded-full border border-[var(--primary)]/30 animate-ping" />
-        {/* Middle ring */}
-        <div className="absolute w-10 h-10 rounded-full border border-[var(--primary)]/50" />
-        {/* Center dot + cross */}
-        <div className="relative w-8 h-8 flex items-center justify-center">
-          <div className="absolute w-[1.5px] h-7 bg-[var(--primary)] shadow-[0_0_8px_rgba(255,82,17,0.8)]" />
-          <div className="absolute w-7 h-[1.5px] bg-[var(--primary)] shadow-[0_0_8px_rgba(255,82,17,0.8)]" />
-          <div className="w-2 h-2 rounded-full bg-[var(--primary)] shadow-[0_0_10px_rgba(255,82,17,1)]" />
+      {/* Google Maps Pinpoint */}
+      <div className="relative flex items-center justify-center w-0 h-0">
+        {/* Ground Target Dot */}
+        <div className="absolute w-2 h-2 rounded-full bg-[var(--primary)] border border-white shadow-[0_0_6px_rgba(255,82,17,0.6)] z-0" />
+
+        {/* Pulsing ring on ground */}
+        <div 
+          className={`absolute w-12 h-12 rounded-full border-2 border-[var(--primary)]/30 transition-all duration-300 ${
+            isDragging ? 'scale-75 opacity-0' : 'animate-ping opacity-100'
+          }`} 
+        />
+
+        {/* Ground Shadow */}
+        <div 
+          className="absolute w-7 h-1.5 bg-black/25 dark:bg-black/50 rounded-full blur-[1px] transition-all duration-300 ease-out z-0"
+          style={{ 
+            transform: `translateY(1px) scale(${isDragging ? 0.4 : 1})`,
+            opacity: isDragging ? 0.35 : 1
+          }}
+        />
+
+        {/* Floating Pin */}
+        <div 
+          className="absolute z-10"
+          style={{
+            bottom: 0,
+            left: '50%',
+            transform: `translateX(-50%) translateY(${isDragging ? '-28px' : '0px'}) scale(${isDragging ? 1.06 : 1})`,
+            transformOrigin: 'bottom center',
+            transition: 'transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 300ms ease-out',
+            filter: isDragging ? 'drop-shadow(0 16px 8px rgba(0,0,0,0.18))' : 'drop-shadow(0 6px 3px rgba(0,0,0,0.22))'
+          }}
+        >
+          <svg width="38" height="46" viewBox="0 0 24 29" fill="none" xmlns="http://www.w3.org/2000/svg" className="block">
+            <path d="M12 0C5.37 0 0 5.37 0 12C0 21 12 29 12 29C12 29 24 21 24 12C24 5.37 18.63 0 12 0Z" fill="url(#pinGradientPicker)"/>
+            <circle cx="12" cy="12" r="5" fill="white" />
+            <circle cx="12" cy="12" r="2.2" fill="var(--primary)" />
+            <defs>
+              <linearGradient id="pinGradientPicker" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FF8C61" />
+                <stop offset="50%" stopColor="var(--primary)" />
+                <stop offset="100%" stopColor="#D93800" />
+              </linearGradient>
+            </defs>
+          </svg>
         </div>
       </div>
 
@@ -93,6 +131,12 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                   setIsSelectingLocation(false);
                   reverseGeocode(mapCenter[0], mapCenter[1]);
                   playClickSound();
+                } else {
+                  if (onConfirmLocation) {
+                    onConfirmLocation(mapCenter);
+                  } else {
+                    setIsSelectingLocation(false);
+                  }
                 }
               }}
             >

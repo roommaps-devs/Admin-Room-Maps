@@ -162,11 +162,13 @@ export default function MapComponent({
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [isPostingRoom, setIsPostingRoom] = useState(false);
+  const [isFormHidden, setIsFormHidden] = useState(false);
   const [tempQuery, setTempQuery] = useState('');
   const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [lightBoxImage, setLightBoxImage] = useState<string | null>(null);
+  const [isMapDragging, setIsMapDragging] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -289,7 +291,15 @@ export default function MapComponent({
     }
     setIsPostingRoom(true);
     setIsSelectingLocation(true);
+    setIsFormHidden(false);
   }, [user, router]);
+
+  const handleConfirmLocation = useCallback((coords: [number, number]) => {
+    setMapCenter(coords);
+    setIsFormHidden(false);
+    setIsSelectingLocation(false);
+    playClickSound();
+  }, [playClickSound]);
 
   // Filtered Rooms logic
   const filteredRooms = useMemo(() => {
@@ -554,9 +564,11 @@ export default function MapComponent({
         setSearchCenter={(coords: [number, number]) => dispatch(setSearchCenter(coords))}
         reverseGeocode={reverseGeocode}
         playClickSound={playClickSound}
+        onConfirmLocation={handleConfirmLocation}
+        isDragging={isMapDragging}
       />
 
-      {isPostingRoom && (
+      {isPostingRoom && !isFormHidden && (
         <PostListingForm
           mode={mode}
           mapCenter={mapCenter}
@@ -572,6 +584,10 @@ export default function MapComponent({
           onSuccess={() => {
             setIsPostingRoom(false);
             setIsSelectingLocation(false);
+          }}
+          onSelectManualLocation={() => {
+            setIsFormHidden(true);
+            setIsSelectingLocation(true);
           }}
         />
       )}
@@ -624,6 +640,7 @@ export default function MapComponent({
         openBottomSheet={openBottomSheet}
         formatRentCompact={formatRentCompact}
         onBoundsChange={handleBoundsChange}
+        setIsDragging={setIsMapDragging}
       />
 
       {/* Desktop Staying Insights Sidebar */}
