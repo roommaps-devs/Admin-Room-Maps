@@ -23,6 +23,8 @@ import StoreProvider from "@/store/StoreProvider";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import GlobalLoader from "@/components/GlobalLoader";
+import TesterWelcomePopup from "@/components/TesterWelcomePopup";
 
 export default function RootLayout({
   children,
@@ -48,6 +50,12 @@ export default function RootLayout({
 
       <body className="min-h-screen flex flex-col">
   <StoreProvider>
+
+    {/* Global Route Loader */}
+    <GlobalLoader />
+
+    {/* Tester Welcome Popup (Only shows first time) */}
+    <TesterWelcomePopup />
 
     {/* Header */}
     <Header />

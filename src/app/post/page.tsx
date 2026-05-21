@@ -27,20 +27,7 @@ export default function PostPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-primary)]">
-      {/* Navbar for this specific page */}
-      <nav className="sticky top-0 z-[100] bg-[var(--bg-color)]/80 backdrop-blur-xl border-b border-[var(--glass-border)] px-6 py-4">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between">
-          <LogoWordmark variant="nav" />
-          
-          <button 
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]/50 hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ArrowLeft size={18} />
-            Back
-          </button>
-        </div>
-      </nav>
+
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 md:py-12">
         <div className="flex flex-col-reverse lg:flex-row gap-8 lg:gap-16 items-start">

@@ -4,7 +4,7 @@ import { useCallback, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSelector, useDispatch } from 'react-redux';
-import { Search, MapPin, PlusCircle, Home as HomeIcon, Loader2, Plane, Star, Key, Home, Shield } from 'lucide-react';
+import { Search, MapPin, PlusCircle, Home as HomeIcon, Loader2, Plane, Star, Key, Home, Shield, X } from 'lucide-react';
 import ModeToggle from '@/components/ui/ModeToggle';
 import { RootState } from '@/store/store';
 import { useRouter } from 'next/navigation';
@@ -271,10 +271,12 @@ export default function Hero() {
             <Search className="text-[#0A0A0A]/20 ml-3 md:ml-6 group-focus-within:text-[#FF5733] transition-colors shrink-0" size={20} />
             <input
               type="text"
+              name="room_search_query"
+              id="room_search_query"
               className="flex-1 min-w-0 text-ellipsis bg-transparent border-none text-[#0A0A0A] text-base md:text-xl placeholder:text-[#0A0A0A]/20 outline-none font-medium h-12 md:h-14"
               placeholder={mode === 'travelers' ? 'Where are you traveling to?' : 'Search by area, city or locality...'}
               value={searchQuery}
-              autoComplete="off"
+              autoComplete="new-password"
               onChange={(e) => {
                 dispatch(setSearchQuery(e.target.value));
               }}
@@ -282,6 +284,20 @@ export default function Hero() {
               onBlur={() => setTimeout(() => dispatch(setShowSuggestions(false)), 200)}
               onFocus={() => { if (suggestions.length > 0) dispatch(setShowSuggestions(true)); }}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch(setSearchQuery(''));
+                  dispatch(setSuggestions([]));
+                  dispatch(setShowSuggestions(false));
+                }}
+                className="p-1.5 md:p-2 text-[#0A0A0A]/30 hover:text-[#FF5733] transition-colors mr-1"
+                aria-label="Clear search"
+              >
+                <X size={20} />
+              </button>
+            )}
             {isSearching && <Loader2 size={18} className="animate-spin text-[#FF5733] mr-2.5" />}
             <button
               className="relative overflow-hidden bg-[#FF5733] text-white px-4 md:px-12 h-12 md:h-14 rounded-full font-black text-sm md:text-lg cursor-pointer transition-all duration-300 shadow-[0_10px_25px_rgba(255,87,51,0.3)] hover:scale-[1.03] hover:shadow-[0_15px_35px_rgba(255,87,51,0.5)] active:scale-95 group/btn"
