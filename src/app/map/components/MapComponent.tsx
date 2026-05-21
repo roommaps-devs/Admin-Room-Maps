@@ -627,7 +627,7 @@ export default function MapComponent({
       />
 
       {/* Desktop Staying Insights Sidebar */}
-      {!isSelectingLocation && !isPostingRoom && viewportCounts && (isAreaView ? Object.keys(viewportCounts.areaWise).length > 0 : Object.keys(viewportCounts.cityWise).length > 0) && (
+      {/* {!isSelectingLocation && !isPostingRoom && viewportCounts && (isAreaView ? Object.keys(viewportCounts.areaWise).length > 0 : Object.keys(viewportCounts.cityWise).length > 0) && (
         <div 
           className="hidden md:flex flex-col gap-3 fixed top-20 left-4 w-72 max-h-[calc(100vh-120px)] rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.12)] p-4 overflow-hidden z-[999] transition-all duration-300"
           style={{
@@ -673,7 +673,7 @@ export default function MapComponent({
               })}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Mobile Staying Insights Horizontal Pill Tray */}
       {!isSelectingLocation && !isPostingRoom && viewportCounts && (isAreaView ? Object.keys(viewportCounts.areaWise).length > 0 : Object.keys(viewportCounts.cityWise).length > 0) && (

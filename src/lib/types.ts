@@ -22,10 +22,13 @@ export interface Room {
   bhk?: string;
   gender?: string;
   isFavorite?: boolean;
+  userId?: string;
+  createdByEmail?: string;
 }
 
 export interface User {
   uid: string;
+  id?: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;

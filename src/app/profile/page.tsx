@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { getRequest } from "@/lib/apiCall"
+import { getCookie } from "cookies-next"
 import { Post } from "@/app/listing/page"
 import ListCard from "@/components/ListCard"
 import { Button } from "@/components/ui/button"
@@ -104,6 +105,7 @@ type Tab = "listings" | "favorites"
 
 export default function ProfilePage() {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>("listings")
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [myListings, setMyListings] = useState<Post[]>([])
@@ -112,12 +114,34 @@ export default function ProfilePage() {
   const [loadingListings, setLoadingListings] = useState(true)
   const [loadingFavorites, setLoadingFavorites] = useState(true)
 
+  const handleFavoriteToggle = (postId: string, isFavorited: boolean) => {
+    if (!isFavorited) {
+      setFavorites(prev => prev.filter(post => post.id !== postId));
+    }
+  };
+
   /* Fetchers */
   useEffect(() => {
+    setMounted(true)
+    
+    // Immediate redirect if no token cookie exists
+    const token = getCookie("drive_access_token") || getCookie("roommaps_auth")
+    if (!token) {
+      router.push("/login?redirect=/profile")
+      return
+    }
+
     const fetchProfile = async () => {
       try {
         const res = await getRequest<{ success: boolean; data: UserProfile }>("/user/profile")
-        if (res?.success) setProfile(res.data)
+        if (res?.success) {
+          setProfile(res.data)
+        } else {
+          router.push("/login?redirect=/profile")
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile:", error)
+        router.push("/login?redirect=/profile")
       } finally {
         setLoadingProfile(false)
       }
@@ -146,7 +170,7 @@ export default function ProfilePage() {
     fetchProfile()
     fetchMyListings()
     fetchFavorites()
-  }, [])
+  }, [router])
 
   /* Helpers */
   const initials = profile?.name
@@ -161,6 +185,14 @@ export default function ProfilePage() {
     { id: "listings", label: "My Listings", icon: Building2, count: myListings.length, loading: loadingListings },
     { id: "favorites", label: "Saved", icon: Bookmark, count: favorites.length, loading: loadingFavorites },
   ]
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF5211]"></div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -327,7 +359,7 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {favorites.map(post => <ListCard key={post.id} post={post} />)}
+                  {favorites.map(post => <ListCard key={post.id} post={post} onFavoriteToggle={handleFavoriteToggle} />)}
                 </div>
               )}
             </div>

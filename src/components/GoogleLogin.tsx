@@ -68,7 +68,7 @@
 
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { setCookie } from "cookies-next";
 import { useDispatch } from "react-redux";
 import { setUser } from "@/store/userSlice";
@@ -78,6 +78,7 @@ import { useState } from "react";
 
 export default function GoogleLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
 
@@ -115,7 +116,8 @@ export default function GoogleLogin() {
 
           if (verifyRes.success) {
             dispatch(setUser(verifyRes.data?.user || verifyRes.data || data.data?.user));
-            router.push("/");
+            const redirect = searchParams.get("redirect");
+            router.push(redirect || "/");
           } else {
             router.push("/login");
           }

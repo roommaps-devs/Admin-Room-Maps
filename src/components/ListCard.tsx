@@ -7,19 +7,28 @@ import {
   User,
   Heart,
   BadgeIndianRupee,
+  ChevronDown,
 } from "lucide-react"
 import ImageSlider from "@/components/ImageSlider"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Post } from "@/app/listing/page"
 import { postRequest, deleteRequest } from "@/lib/apiCall"
+import { useSelector } from "react-redux"
+import { RootState } from "@/store/store"
 
 interface ListCardProps {
-  post: Post
+  post: Post;
+  onFavoriteToggle?: (postId: string, isFavorited: boolean) => void;
 }
 
-const ListCard = ({ post }: ListCardProps) => {
+const ListCard = ({ post, onFavoriteToggle }: ListCardProps) => {
   const router = useRouter();
+  const { user } = useSelector((state: RootState) => state.user);
+  const isOwnPost = user && (
+    (post.userId && (user.id === post.userId || user.uid === post.userId)) ||
+    (post.createdByEmail && user.email === post.createdByEmail)
+  );
   const [isFavorited, setIsFavorited] = useState(post.isFavorite || false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -34,16 +43,28 @@ const ListCard = ({ post }: ListCardProps) => {
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) {
+      router.push(`/login?redirect=${window.location.pathname + window.location.search}`);
+      return;
+    }
+    if (isOwnPost) return;
     if (isSubmitting) return;
 
     setIsSubmitting(true);
     try {
       if (isFavorited) {
         const res = await deleteRequest<{ success: boolean }>(`/post/removeFavorite/${post.id}`);
-        if (res?.success) setIsFavorited(false);
+        if (res?.success) {
+          setIsFavorited(false);
+          if (onFavoriteToggle) onFavoriteToggle(post.id, false);
+          router.refresh();
+        }
       } else {
         const res = await postRequest<{ success: boolean }>(`/post/addFavorite/${post.id}`);
-        if (res?.success) setIsFavorited(true);
+        if (res?.success) {
+          setIsFavorited(true);
+          if (onFavoriteToggle) onFavoriteToggle(post.id, true);
+        }
       }
     } catch (error) {
       console.error("Failed to toggle favorite:", error);
@@ -85,13 +106,15 @@ const ListCard = ({ post }: ListCardProps) => {
         </div>
 
         {/* HEART */}
-        <button 
-          onClick={toggleFavorite}
-          disabled={isSubmitting}
-          className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur-md p-2 rounded-full shadow hover:scale-110 transition-all disabled:opacity-50"
-        >
-          <Heart className={`w-4 h-4 transition-colors ${isFavorited ? "text-red-500 fill-red-500" : "text-gray-400"}`} />
-        </button>
+        {!isOwnPost && (
+          <button 
+            onClick={toggleFavorite}
+            disabled={isSubmitting}
+            className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur-md p-2 rounded-full shadow hover:scale-110 transition-all disabled:opacity-50"
+          >
+            <Heart className={`w-4 h-4 transition-colors ${isFavorited ? "text-red-500 fill-red-500" : "text-gray-400"}`} />
+          </button>
+        )}
 
         {/* PRICE */}
         <div className="absolute bottom-3 left-3 z-20 bg-white/95 backdrop-blur-md px-3 sm:px-4 py-2 rounded-2xl shadow-xl">
@@ -147,12 +170,24 @@ const ListCard = ({ post }: ListCardProps) => {
         </div>
 
         {/* LOCATION */}
-        <div className="flex items-center gap-2 mt-5 text-neutral-500">
-          <MapPin className="w-4 h-4 shrink-0" />
-          <span className="text-xs sm:text-sm line-clamp-1">
+        <a
+          href={
+            post.lat && post.lng
+              ? `https://www.google.com/maps/search/?api=1&query=${post.lat},${post.lng}`
+              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  `${post.name}, ${post.city}, ${post.state || ""}`
+                )}`
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-2 mt-5 text-neutral-500 hover:text-orange-500 transition-colors w-fit group/loc"
+        >
+          <MapPin className="w-4 h-4 shrink-0 text-neutral-400 group-hover/loc:text-orange-500 transition-colors" />
+          <span className="text-xs sm:text-sm line-clamp-1 underline decoration-dotted underline-offset-2">
             {post.city}, {post.state}
           </span>
-        </div>
+        </a>
 
         {/* FOOTER */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-5 pt-5 border-t border-neutral-100">
@@ -171,15 +206,36 @@ const ListCard = ({ post }: ListCardProps) => {
             </div>
           </div>
 
-          {/* CALL BUTTON */}
-          <Link
-            href={`tel:${post.phone}`}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg transition-all"
-          >
-            <Phone className="w-4 h-4" />
-            Call Now
-          </Link>
+          {/* ACTIONS */}
+          <div className="flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto">
+            {/* GOOGLE MAPS LINK */}
+            <a
+              href={
+                post.lat && post.lng
+                  ? `https://www.google.com/maps/search/?api=1&query=${post.lat},${post.lng}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      `${post.name}, ${post.city}, ${post.state || ""}`
+                    )}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-[#FF5211] hover:text-orange-600 active:scale-95 font-extrabold text-sm transition-all"
+            >
+              <span>view on map</span>
+              <ChevronDown className="w-4.5 h-4.5 text-[#FF5211] shrink-0" />
+            </a>
+
+            {/* CALL BUTTON */}
+            <Link
+              href={`tel:${post.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center justify-center gap-2 bg-[#FF5211] hover:bg-orange-600 active:scale-95 text-white px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold shadow-lg transition-all"
+            >
+              <Phone className="w-4 h-4" />
+              Call Now
+            </Link>
+          </div>
         </div>
       </div>
     </div>

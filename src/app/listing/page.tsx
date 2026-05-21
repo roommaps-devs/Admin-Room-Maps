@@ -37,6 +37,10 @@ export interface Post {
   availabilityStatus: string
   images: PostImage[]
   isFavorite?: boolean
+  userId?: string
+  createdByEmail?: string
+  lat?: number
+  lng?: number
 }
 
 export interface ApiResponse<T> {

@@ -21,6 +21,9 @@ import Image from "next/image";
 import { Room } from "@/lib/types";
 import { getRequest, postRequest, deleteRequest } from "@/lib/apiCall";
 import { resolveImageUrl } from "@/lib/hooks/useRooms";
+import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 
 interface RoomDetailModalProps {
   isOpen: boolean;
@@ -57,7 +60,15 @@ export default function RoomDetailModal({
   similarRooms: externalSimilarRooms = [],
   viewMode,
 }: RoomDetailModalProps) {
+  const router = useRouter();
+  const { user } = useSelector((state: RootState) => state.user);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(initialRoom);
+  const isOwnPost = !!(
+    user &&
+    currentRoom &&
+    ((currentRoom.userId && (user.id === currentRoom.userId || user.uid === currentRoom.userId)) ||
+      (currentRoom.createdByEmail && user.email === currentRoom.createdByEmail))
+  );
   const [isFavorited, setIsFavorited] = useState(false);
   const [isFavoriteSubmitting, setIsFavoriteSubmitting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -117,6 +128,8 @@ export default function RoomDetailModal({
               bhk: item.bhk,
               gender: item.gender,
               isFavorite: !!item.isFavorite,
+              userId: item.userId || item.user?.id || initialRoom?.userId,
+              createdByEmail: item.createdByEmail || initialRoom?.createdByEmail,
             };
             setCurrentRoom(fullRoom);
             setIsFavorited(!!item.isFavorite);
@@ -173,13 +186,21 @@ export default function RoomDetailModal({
   }, [showReportModal]);
 
   const handleToggleFavorite = async () => {
+    if (!user) {
+      router.push(`/login?redirect=${window.location.pathname + window.location.search}`);
+      return;
+    }
+    if (isOwnPost) return;
     if (!currentRoom || isFavoriteSubmitting) return;
 
     setIsFavoriteSubmitting(true);
     try {
       if (isFavorited) {
         const res = await deleteRequest<{ success: boolean }>(`/post/removeFavorite/${currentRoom.id}`);
-        if (res?.success) setIsFavorited(false);
+        if (res?.success) {
+          setIsFavorited(false);
+          router.refresh();
+        }
       } else {
         const res = await postRequest<{ success: boolean }>(`/post/addFavorite/${currentRoom.id}`);
         if (res?.success) setIsFavorited(true);
@@ -383,13 +404,15 @@ export default function RoomDetailModal({
                 {currentRoom.name || currentRoom.type}
               </h2>
             </div>
-            <button
-              onClick={handleToggleFavorite}
-              disabled={isFavoriteSubmitting}
-              className="p-1.5 rounded-full border border-gray-200 bg-white shadow-sm disabled:opacity-50"
-            >
-              <Heart size={18} className={isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"} />
-            </button>
+            {!isOwnPost && (
+              <button
+                onClick={handleToggleFavorite}
+                disabled={isFavoriteSubmitting}
+                className="p-1.5 rounded-full border border-gray-200 bg-white shadow-sm disabled:opacity-50"
+              >
+                <Heart size={18} className={isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"} />
+              </button>
+            )}
           </div>
 
           {/* Price & Deposit */}
