@@ -14,6 +14,8 @@ import {
   setBottomSheetOpen,
 } from '@/store/mapSlice';
 import { ResponseMessage } from '@/components/ResponseMessage';
+import { getRequest } from '@/lib/apiCall';
+import { resolveImageUrl } from '@/lib/hooks/useRooms';
 
 interface UseMapInitializationProps {
   initialRooms: any[];
@@ -97,27 +99,74 @@ export function useMapInitialization({
 
   // Handle initial room ID from URL
   useEffect(() => {
-    if (initialId && initialRooms.length > 0) {
-      const roomIdStr = String(initialId);
-      const room = initialRooms.find(r => String(r.id) === roomIdStr);
+    if (!initialId) return;
 
-      if (room && room.lat && room.lng) {
-        const coords: [number, number] = [Number(room.lat), Number(room.lng)];
-        if (room.category && room.category !== mode) {
-          dispatch(setMode(room.category as 'rent' | 'travelers'));
+    const roomIdStr = String(initialId);
+    
+    const selectAndCenterRoom = (targetRoom: any) => {
+      if (targetRoom && targetRoom.lat && targetRoom.lng) {
+        const coords: [number, number] = [Number(targetRoom.lat), Number(targetRoom.lng)];
+        if (targetRoom.category && targetRoom.category !== mode) {
+          dispatch(setMode(targetRoom.category as 'rent' | 'travelers'));
         }
         dispatch(setSearchCenter(coords));
         setMapCenter(coords);
         dispatch(setMapZoom(16));
         setUseFlyTo(true);
         dispatch(setLocationState('granted'));
-        dispatch(setSearchQuery(room.name || room.city || 'Room Location'));
-        dispatch(setSelectedRoom(room));
+        dispatch(setSearchQuery(targetRoom.name || targetRoom.city || 'Room Location'));
+        dispatch(setSelectedRoom(targetRoom));
         dispatch(setBottomSheetOpen(true));
       }
+    };
+
+    // First, try to find in initialRooms if available
+    const room = initialRooms && initialRooms.length > 0
+      ? initialRooms.find(r => String(r.id) === roomIdStr)
+      : null;
+
+    if (room) {
+      selectAndCenterRoom(room);
+    } else {
+      // Fetch dynamically from server if not found in initialRooms
+      const fetchAndOpenRoom = async () => {
+        try {
+          const res = await getRequest<{ success: boolean; data: any }>(`/post/getById/${roomIdStr}`);
+          if (res?.success && res.data) {
+            const item = res.data;
+            const rawImg = item.images?.[0]?.uploadUrl || item.images?.[0]?.url || (typeof item.images?.[0] === 'string' ? item.images[0] : null) || item.image;
+            
+            const targetRoom = {
+              id: item.id || item.postId || roomIdStr,
+              name: item.name || item.title || 'Room Listing',
+              city: item.city || 'Chandigarh',
+              rent: Number(item.rent) || 10000,
+              lat: Number(item.lat) || 30.7333,
+              lng: Number(item.lng) || 76.7794,
+              category: String(item.category || 'rent').toLowerCase(),
+              type: item.type || item.propertyType || 'Room',
+              image: resolveImageUrl(rawImg),
+              images: item.images ? item.images.map((img: any) => typeof img === 'string' ? img : (img.uploadUrl || img.url)).filter(Boolean) : [],
+              location: item.address || item.location,
+              isTrending: !!item.isTrending,
+              owner: item.owner,
+              phone: item.phone,
+              amenities: item.amenities || [],
+              furnished: item.furnished,
+              bhk: item.bhk,
+              gender: item.gender,
+              isFavorite: !!item.isFavorite
+            };
+            selectAndCenterRoom(targetRoom);
+          }
+        } catch (error) {
+          console.error("Failed to fetch initialId room from API:", error);
+        }
+      };
+      fetchAndOpenRoom();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialId, initialRooms.length, dispatch]);
+  }, [initialId, initialRooms, dispatch]);
 
   const nearbyInitializedRef = useRef(false);
 
