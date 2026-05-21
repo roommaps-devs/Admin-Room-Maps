@@ -3,7 +3,7 @@
 "use client"
 
 import { getRequest } from "@/lib/apiCall"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 
 import {
   ChevronDown,
@@ -112,6 +112,7 @@ const ListingPage = () => {
 
   const [allPost, setAllPost] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -131,10 +132,14 @@ const ListingPage = () => {
      FETCH POSTS
   ===================================================== */
 
-  const getAllPost = async () => {
+  const getAllPost = useCallback(async (pageToFetch: number, clearExisting: boolean) => {
     try {
-
-      setLoading(true)
+      await Promise.resolve()
+      if (clearExisting) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
 
       const params = new URLSearchParams()
 
@@ -163,7 +168,7 @@ const ListingPage = () => {
 
       /* PAGINATION */
 
-      params.append("page", currentPage.toString())
+      params.append("page", pageToFetch.toString())
       params.append("limit", "9")
 
       const res = await getRequest(
@@ -171,9 +176,13 @@ const ListingPage = () => {
       ) as ApiResponse<Post[]>
 
       if (res?.success) {
-
-        setAllPost(res.data.posts)
-
+        if (clearExisting) {
+          setAllPost(res.data.posts)
+          setCurrentPage(1)
+        } else {
+          setAllPost((prev) => [...prev, ...res.data.posts])
+          setCurrentPage(pageToFetch)
+        }
         setTotalPages(res.data.totalPages)
       }
 
@@ -181,16 +190,46 @@ const ListingPage = () => {
       console.error(error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
-  }
+  }, [filters])
 
   /* =====================================================
-     EFFECT
+     EFFECTS & HANDLERS
   ===================================================== */
 
   useEffect(() => {
-    getAllPost()
-  }, [filters, currentPage])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    getAllPost(1, true)
+  }, [getAllPost])
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || currentPage >= totalPages) return
+    const nextPage = currentPage + 1
+    getAllPost(nextPage, false)
+  }, [loading, loadingMore, currentPage, totalPages, getAllPost])
+
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { rootMargin: "200px" }
+    )
+
+    observer.observe(sentinel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [loadMore])
 
 
   /* =====================================================
@@ -309,56 +348,23 @@ const ListingPage = () => {
               </div>
 
               {/* ===============================================
-                  PAGINATION
+                  INFINITE SCROLL SENTINEL & LOADER
               =============================================== */}
-
-              <div className="flex items-center justify-center gap-3 mt-10 flex-wrap">
-
-                {/* PREVIOUS */}
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() =>
-                    setCurrentPage((prev) => prev - 1)
-                  }
-                  className={`px-5 py-3 rounded-2xl font-bold transition-all ${
-                    currentPage === 1
-                      ? "bg-neutral-200 text-neutral-400 cursor-not-allowed"
-                      : "bg-orange-500 text-white hover:bg-orange-600"
-                  }`}
-                >
-                  Previous
-                </button>
-
-                {/* PAGE NUMBERS */}
-                {Array.from({ length: totalPages }).map((_, index) => (
-
+              <div ref={sentinelRef} className="w-full flex flex-col items-center justify-center mt-10 min-h-[60px]">
+                {loadingMore && (
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="w-8 h-8 border-4 border-neutral-200 border-t-orange-500 rounded-full animate-spin"></span>
+                    <span className="text-sm font-semibold text-neutral-500">Loading more properties...</span>
+                  </div>
+                )}
+                {!loadingMore && currentPage < totalPages && (
                   <button
-                    key={index}
-                    onClick={() => setCurrentPage(index + 1)}
-                    className={`w-12 h-12 rounded-2xl font-bold transition-all ${
-                      currentPage === index + 1
-                        ? "bg-orange-500 text-white"
-                        : "bg-white border border-neutral-200 text-neutral-700 hover:bg-orange-50"
-                    }`}
+                    onClick={loadMore}
+                    className="px-6 py-3 bg-white border border-neutral-200 text-neutral-700 font-bold rounded-2xl hover:bg-orange-50 hover:text-orange-500 hover:border-orange-200 transition-all shadow-sm"
                   >
-                    {index + 1}
+                    Load More Properties
                   </button>
-                ))}
-
-                {/* NEXT */}
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() =>
-                    setCurrentPage((prev) => prev + 1)
-                  }
-                  className={`px-5 py-3 rounded-2xl font-bold transition-all ${
-                    currentPage === totalPages
-                      ? "bg-neutral-200 text-neutral-400 cursor-not-allowed"
-                      : "bg-orange-500 text-white hover:bg-orange-600"
-                  }`}
-                >
-                  Next
-                </button>
+                )}
               </div>
             </>
           )}
