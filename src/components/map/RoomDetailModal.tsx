@@ -101,7 +101,6 @@ export default function RoomDetailModal({
               lng: Number(item.lng) || 76.7794,
               category: String(item.category || "rent").toLowerCase(),
               type: item.type || item.propertyType || "Room",
-              image: resolveImageUrl(rawImg),
               images: item.images
                 ? item.images
                     .map((img: any) =>
@@ -132,10 +131,13 @@ export default function RoomDetailModal({
     }
   }, [initialRoom]);
 
+  console.log(initialRoom , "initialRoom")
+
   useEffect(() => {
     if (currentRoom) {
       const images = currentRoom.images?.filter(Boolean) || (currentRoom.image ? [currentRoom.image] : []);
-      const resolved = images.map((img) => resolveImageUrl(img)).filter(Boolean);
+     console.log(currentRoom , "currentRoomcurrentRoom") 
+      const resolved = images.map((img) =>  img);
       setImageList(resolved);
       setCurrentImageIndex(0);
     }
@@ -238,7 +240,7 @@ export default function RoomDetailModal({
   if (!isOpen || !currentRoom) return null;
 
 
-  console.log(currentRoom , "currentRoom")
+  console.log(`${url}${imageList[currentImageIndex]}`, "imageListimageList")
 
   return (
     <div
@@ -312,10 +314,11 @@ export default function RoomDetailModal({
           {imageList.length > 0 ? (
             <>
               <Image
-                src={url + imageList[currentImageIndex]}
+                src={`${url}${imageList[currentImageIndex]}`}
                 alt={currentRoom.name}
                 fill
                 className="object-cover"
+
                 priority
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
@@ -459,8 +462,8 @@ export default function RoomDetailModal({
                       className="flex-shrink-0 w-32 bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-all text-left"
                     >
                       <div className="relative h-20 w-full bg-gray-100">
-                        {resolveImageUrl(rec.image) ? (
-                          <Image src={resolveImageUrl(rec.image)} alt={rec.name} fill className="object-cover" />
+                        {rec.image ? (
+                          <Image src={rec.image} alt={rec.name} fill className="object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <Home size={16} className="text-gray-300" />
