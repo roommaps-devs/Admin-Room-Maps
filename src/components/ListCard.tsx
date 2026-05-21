@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react"
 import {
   Phone,
   MapPin,
@@ -8,15 +11,44 @@ import {
 import ImageSlider from "@/components/ImageSlider"
 import Link from "next/link"
 import { Post } from "@/app/listing/page"
+import { postRequest, deleteRequest } from "@/lib/apiCall"
 
 interface ListCardProps {
   post: Post
 }
 
 const ListCard = ({ post }: ListCardProps) => {
+  const [isFavorited, setIsFavorited] = useState(post.isFavorite || false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setIsFavorited(post.isFavorite || false);
+  }, [post.isFavorite]);
+
   const formatRent = (rent: number) => {
     return new Intl.NumberFormat("en-IN").format(rent)
   }
+
+  const toggleFavorite = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      if (isFavorited) {
+        const res = await deleteRequest<{ success: boolean }>(`/post/removeFavorite/${post.id}`);
+        if (res?.success) setIsFavorited(false);
+      } else {
+        const res = await postRequest<{ success: boolean }>(`/post/addFavorite/${post.id}`);
+        if (res?.success) setIsFavorited(true);
+      }
+    } catch (error) {
+      console.error("Failed to toggle favorite:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="group bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden shadow-sm border border-neutral-200 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
@@ -44,8 +76,12 @@ const ListCard = ({ post }: ListCardProps) => {
         </div>
 
         {/* HEART */}
-        <button className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur-md p-2 rounded-full shadow hover:scale-110 transition-all">
-          <Heart className="w-4 h-4 text-red-500" />
+        <button 
+          onClick={toggleFavorite}
+          disabled={isSubmitting}
+          className="absolute top-3 right-3 z-20 bg-white/90 backdrop-blur-md p-2 rounded-full shadow hover:scale-110 transition-all disabled:opacity-50"
+        >
+          <Heart className={`w-4 h-4 transition-colors ${isFavorited ? "text-red-500 fill-red-500" : "text-gray-400"}`} />
         </button>
 
         {/* PRICE */}

@@ -21,6 +21,7 @@ export interface Room {
   amenities?: string[];
   bhk?: string;
   gender?: string;
+  isFavorite?: boolean;
 }
 
 export interface User {

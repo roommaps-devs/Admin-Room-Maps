@@ -36,6 +36,7 @@ export interface Post {
   isTrending: boolean
   availabilityStatus: string
   images: PostImage[]
+  isFavorite?: boolean
 }
 
 export interface ApiResponse<T> {
