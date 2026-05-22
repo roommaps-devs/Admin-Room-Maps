@@ -13,7 +13,7 @@ import {
 import ImageSlider from "@/components/ImageSlider"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Post } from "@/app/listing/page"
+import { Post } from "@/lib/types"
 import { postRequest, deleteRequest } from "@/lib/apiCall"
 import { useSelector } from "react-redux"
 import { RootState } from "@/store/store"
@@ -128,7 +128,7 @@ const ListCard = ({ post, onFavoriteToggle }: ListCardProps) => {
       ========================================= */}
       <div className="relative">
         <ImageSlider
-          images={post.images}
+          images={(post.images || []).map(img => typeof img === 'string' ? { url: img } : (img && typeof img === 'object' && 'url' in img ? img : { url: String(img) })) as any}
           alt={post.name}
           className="h-[220px] sm:h-[250px] lg:h-[280px]"
         />

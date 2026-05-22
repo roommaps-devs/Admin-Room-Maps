@@ -25,6 +25,7 @@ export interface Room {
   userId?: string;
   createdByEmail?: string;
   createdAt?: string;
+  availabilityStatus?: string;
 }
 
 export interface User {
@@ -37,7 +38,10 @@ export interface User {
   image?: string | null;
 }
 
+export type Post = Room;
+
 export interface SearchSuggestion {
+
   properties: {
     name?: string;
     city?: string;

@@ -21,7 +21,6 @@ export const metadata: Metadata = {
 
 import StoreProvider from "@/store/StoreProvider";
 import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import GlobalLoader from "@/components/GlobalLoader";
 import TesterWelcomePopup from "@/components/TesterWelcomePopup";
@@ -64,9 +63,6 @@ export default function RootLayout({
     <main className="flex-1 pt-[80px]">
       {children}
     </main>
-
-    {/* Footer */}
-    <Footer />
 
     {/* Mobile Bottom Nav */}
     <BottomNav />
