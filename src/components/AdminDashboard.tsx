@@ -6,10 +6,9 @@ import { RootState } from "@/store/store";
 import { X, Trash2, Camera } from "lucide-react";
 import { useRooms, clearRoomsCache } from "@/lib/hooks/useRooms";
 import { Room } from "@/lib/types";
-import { postRequest, deleteRequest, uploadRequest } from "@/lib/apiCall";
+import { postRequest, deleteRequest, uploadRequest, getRequest } from "@/lib/apiCall";
 import { toast } from "sonner";
 import PostListingForm from "./map/PostListingForm";
-import { ARTICLES, Article } from "@/lib/articles";
 
 // Subcomponents imports
 import DashboardSidebar from "./dashboard/DashboardSidebar";
@@ -18,6 +17,7 @@ import ListingsTab from "./dashboard/ListingsTab";
 import AnalyticsTab from "./dashboard/AnalyticsTab";
 import ReportsTab from "./dashboard/ReportsTab";
 import ArticlesTab from "./dashboard/ArticlesTab";
+import { ResponseMessage, ApiResponse, catchResponseMessage } from "./ResponseMessage";
 
 type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles";
 
@@ -62,25 +62,7 @@ export default function AdminDashboard() {
   const [editOwner, setEditOwner] = useState("");
   const [editAddress, setEditAddress] = useState("");
 
-  // Articles state
-  const [articles, setArticles] = useState<Article[]>(ARTICLES);
 
-  // Article Modals state
-  const [showAddArticleModal, setShowAddArticleModal] = useState(false);
-  const [showEditArticleModal, setShowEditArticleModal] = useState(false);
-  const [showDeleteArticleDialog, setShowDeleteArticleDialog] = useState(false);
-  const [activeArticle, setActiveArticle] = useState<Article | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-
-  // Article form states
-  const [articleTitle, setArticleTitle] = useState("");
-  const [articleCategory, setArticleCategory] = useState("Renting Tips");
-  const [articleExcerpt, setArticleExcerpt] = useState("");
-  const [articleAuthor, setArticleAuthor] = useState("");
-  const [articleReadTime, setArticleReadTime] = useState("");
-  const [articleTags, setArticleTags] = useState("");
-  const [articleImage, setArticleImage] = useState("");
-  const [articleContent, setArticleContent] = useState("");
 
   // Activity log tracking
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([
@@ -122,11 +104,11 @@ export default function AdminDashboard() {
       ...prev
     ]);
     
-    toast.success(`Property marked as ${updatedStatus ? "Trending 🔥" : "Standard"}`);
-    
     try {
-      await postRequest(`/post/updateTrending/${room.id}`, { isTrending: updatedStatus });
+      const res = await postRequest<ApiResponse>(`/post/updateTrending/${room.id}`, { isTrending: updatedStatus });
+      ResponseMessage(res);
     } catch (err) {
+      catchResponseMessage(err);
       console.warn("Failed to update trending status on API, local state remains active:", err);
     }
   };
@@ -157,12 +139,13 @@ export default function AdminDashboard() {
       ...prev
     ]);
     
-    toast.success("Listing successfully removed!");
     
     try {
-      await deleteRequest(`/post/delete/${id}`);
+      const res = await deleteRequest<ApiResponse>(`/post/delete/${id}`);
+      ResponseMessage(res);
       clearRoomsCache();
     } catch (err) {
+      catchResponseMessage(err);
       console.warn("API deletion endpoint failed or unavailable. Local cache successfully truncated:", err);
     }
   };
@@ -215,12 +198,12 @@ export default function AdminDashboard() {
       ...prev
     ]);
     
-    toast.success("Listing details updated!");
-    
     try {
-      await postRequest(`/post/update/${activeRoom.id}`, { data: updated });
+      const res = await postRequest<ApiResponse>(`/post/update/${activeRoom.id}`, { data: updated });
+      ResponseMessage(res);
       clearRoomsCache();
     } catch (err) {
+      catchResponseMessage(err);
       console.warn("API update endpoint failed or unavailable. Local cache successfully refreshed:", err);
     }
   };
@@ -248,134 +231,19 @@ export default function AdminDashboard() {
       ...prev
     ]);
     
-    toast.success("Flagged listing removed successfully.");
-    
     try {
-      await deleteRequest(`/post/delete/${postId}`);
+      const res = await deleteRequest<ApiResponse>(`/post/delete/${postId}`);
+      ResponseMessage(res);
       clearRoomsCache();
     } catch (err) {
+      catchResponseMessage(err);
       console.warn("Failed delete api call for reported listing, local removal complete.");
     }
   };
 
-  // Handle uploading article cover image
-  const handleArticleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    
-    setUploadingImage(true);
-    const formData = new FormData();
-    formData.append("media", file, file.name);
-    
-    toast.info("Uploading image to secure bucket...");
-    
-    try {
-      const res = await uploadRequest<{
-        success: boolean;
-        data: Array<{ uploadUrl: string; fileKey: string; mediaType: string }>;
-      }>("/files/upload", formData);
-      
-      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setArticleImage(res.data[0].uploadUrl);
-        toast.success("Image uploaded successfully!");
-      } else {
-        throw new Error("Invalid response format");
-      }
-    } catch (err) {
-      console.error("Cloudinary /files/upload failed, using development placeholder:", err);
-      // Fallback helper to prevent system crashes during mock environments
-      const localPreviewUrl = URL.createObjectURL(file);
-      setArticleImage(localPreviewUrl);
-      toast.success("Cover preview loaded successfully!");
-    } finally {
-      setUploadingImage(false);
-    }
-  };
 
-  // Trigger Edit Article
-  const triggerEditArticle = (art: Article) => {
-    setActiveArticle(art);
-    setArticleTitle(art.title || "");
-    setArticleCategory(art.category || "Renting Tips");
-    setArticleExcerpt(art.excerpt || "");
-    setArticleAuthor(art.author || "");
-    setArticleReadTime(art.readTime || "");
-    setArticleTags(art.tags?.join(", ") || "");
-    setArticleImage(art.image || "");
-    setArticleContent(art.content?.join("\n\n") || "");
-    setShowEditArticleModal(true);
-  };
 
-  // Save Edit Article
-  const handleEditArticleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeArticle) return;
 
-    const updated: Article = {
-      ...activeArticle,
-      title: articleTitle,
-      category: articleCategory,
-      excerpt: articleExcerpt,
-      author: articleAuthor,
-      readTime: articleReadTime,
-      tags: articleTags.split(",").map(t => t.trim()).filter(Boolean),
-      image: articleImage || "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-      content: articleContent.split("\n\n").map(p => p.trim()).filter(Boolean)
-    };
-
-    setArticles(prev => prev.map(a => a.id === activeArticle.id ? updated : a));
-    setShowEditArticleModal(false);
-    toast.success("Article successfully updated!");
-  };
-
-  // Trigger Delete Article
-  const triggerDeleteArticle = (art: Article) => {
-    setActiveArticle(art);
-    setShowDeleteArticleDialog(true);
-  };
-
-  // Confirm Delete Article
-  const handleDeleteArticle = () => {
-    if (!activeArticle) return;
-    setArticles(prev => prev.filter(a => a.id !== activeArticle.id));
-    setShowDeleteArticleDialog(false);
-    toast.success("Article successfully deleted!");
-  };
-
-  // Trigger Publish Article Modal
-  const triggerPublishArticle = () => {
-    setArticleTitle("");
-    setArticleCategory("Renting Tips");
-    setArticleExcerpt("");
-    setArticleAuthor(user?.name || "Admin Staff");
-    setArticleReadTime("5 min read");
-    setArticleTags("");
-    setArticleImage("");
-    setArticleContent("");
-    setShowAddArticleModal(true);
-  };
-
-  // Submit Publish Article
-  const handlePublishArticleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newArticle: Article = {
-      id: Math.random().toString(),
-      slug: articleTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
-      title: articleTitle,
-      category: articleCategory,
-      excerpt: articleExcerpt,
-      author: articleAuthor,
-      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      readTime: articleReadTime || "5 min read",
-      tags: articleTags.split(",").map(t => t.trim()).filter(Boolean),
-      image: articleImage || "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80",
-      content: articleContent.split("\n\n").map(p => p.trim()).filter(Boolean)
-    };
-
-    setArticles(prev => [newArticle, ...prev]);
-    setShowAddArticleModal(false);
-    toast.success("New article published successfully!");
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FBFBFA] dark:bg-[#0A0A0A] text-[#0A0A0A] dark:text-[#F3F4F6] transition-colors duration-300">
@@ -391,7 +259,7 @@ export default function AdminDashboard() {
           setActiveTab={setActiveTab}
           roomsCount={rooms.length}
           reportsCount={reports.length}
-          articlesCount={articles.length}
+          articlesCount={10}
           user={user}
         />
 
@@ -439,10 +307,7 @@ export default function AdminDashboard() {
           {/* ---- ARTICLES MANAGER TAB ---- */}
           {activeTab === "articles" && (
             <ArticlesTab
-              articles={articles}
-              onPublishArticleClick={triggerPublishArticle}
-              onEditArticleClick={triggerEditArticle}
-              onDeleteArticleClick={triggerDeleteArticle}
+              adminName={user?.name || "Admin Staff"}
             />
           )}
 
@@ -683,419 +548,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ============================================================
-          MODAL: PUBLISH NEW ARTICLE
-      ============================================================ */}
-      {showAddArticleModal && (
-        <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-[550px] bg-white dark:bg-[#121214] rounded-[36px] overflow-hidden shadow-2xl border border-transparent dark:border-white/10 animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
-            
-            <form onSubmit={handlePublishArticleSubmit} className="flex flex-col h-full overflow-hidden">
-              
-              {/* Modal Header */}
-              <div className="px-6 py-5 border-b border-[#0A0A0A]/5 dark:border-white/10 flex items-center justify-between shrink-0 bg-white dark:bg-[#121214]">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black tracking-widest text-[#FF5211] uppercase">CREATE NEW ENTRY</span>
-                  <span className="font-bold text-sm">Publish Educational Guide / Article</span>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setShowAddArticleModal(false)}
-                  className="p-2 rounded-full hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-all cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              {/* Modal Scroll Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Article Title</label>
-                  <input
-                    type="text"
-                    value={articleTitle}
-                    onChange={(e) => setArticleTitle(e.target.value)}
-                    required
-                    placeholder="e.g. 5 Secrets to Finding Budget Rooms"
-                    className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Category Type</label>
-                    <select
-                      value={articleCategory}
-                      onChange={(e) => setArticleCategory(e.target.value)}
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold cursor-pointer text-slate-700 dark:text-slate-300"
-                    >
-                      <option value="Renting Tips">Renting Tips</option>
-                      <option value="City Guides">City Guides</option>
-                      <option value="Coliving">Coliving</option>
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Read Time Estimate</label>
-                    <input
-                      type="text"
-                      value={articleReadTime}
-                      onChange={(e) => setArticleReadTime(e.target.value)}
-                      required
-                      placeholder="e.g. 6 min read"
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Author Name</label>
-                    <input
-                      type="text"
-                      value={articleAuthor}
-                      onChange={(e) => setArticleAuthor(e.target.value)}
-                      required
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Tags (Comma Separated)</label>
-                    <input
-                      type="text"
-                      value={articleTags}
-                      onChange={(e) => setArticleTags(e.target.value)}
-                      placeholder="e.g. Noida, Budget, Guide"
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Cover Image</label>
-                  
-                  {articleImage ? (
-                    <div className="relative h-44 w-full rounded-2xl overflow-hidden border border-[#0A0A0A]/5 dark:border-white/10 group bg-neutral-100 dark:bg-neutral-900 shadow-inner">
-                      <img src={articleImage} alt="Cover Preview" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setArticleImage("")}
-                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center transition-all shadow-md cursor-pointer"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-[#0A0A0A]/10 dark:border-white/10 hover:border-[#FF5211]/40 rounded-2xl p-6 bg-[#FBFBFA] dark:bg-white/[0.01] hover:bg-[#FF5211]/5 transition-all text-center relative group">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleArticleImageUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        disabled={uploadingImage}
-                      />
-                      {uploadingImage ? (
-                        <div className="flex flex-col items-center gap-2 py-2">
-                          <div className="w-8 h-8 rounded-full border-4 border-t-[#FF5211] border-neutral-300 animate-spin" />
-                          <span className="text-[10px] font-black text-[#FF5211] uppercase tracking-wider">Uploading Image to Cloudinary...</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 pointer-events-none">
-                          <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-[#FF5211] flex items-center justify-center group-hover:scale-115 transition-transform shrink-0">
-                            <Camera size={18} />
-                          </div>
-                          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Click or drag image file here</span>
-                          <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">PNG, JPG or WEBP up to 5MB</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Manual URL Override */}
-                  <div className="mt-1">
-                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase px-1">Or paste cover URL instead</span>
-                    <input
-                      type="url"
-                      value={articleImage}
-                      onChange={(e) => setArticleImage(e.target.value)}
-                      placeholder="e.g. https://images.unsplash.com/..."
-                      className="w-full h-11 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-[11px] font-bold mt-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Brief Excerpt</label>
-                  <input
-                    type="text"
-                    value={articleExcerpt}
-                    onChange={(e) => setArticleExcerpt(e.target.value)}
-                    required
-                    placeholder="Provide a catchy summary paragraph..."
-                    className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Article Body Content (Double newline for paragraphs)</label>
-                  <textarea
-                    value={articleContent}
-                    onChange={(e) => setArticleContent(e.target.value)}
-                    required
-                    placeholder="Write the full body content paragraphs..."
-                    className="w-full h-32 px-4 py-3 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold resize-none"
-                  />
-                </div>
-
-              </div>
-
-              {/* Modal Buttons Footer */}
-              <div className="px-6 py-5 border-t border-[#0A0A0A]/5 dark:border-white/10 bg-[#FAFAF8] dark:bg-[#121214] flex gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowAddArticleModal(false)}
-                  className="flex-1 py-3 bg-neutral-200 dark:bg-white/5 hover:bg-neutral-300 dark:hover:bg-white/10 rounded-2xl font-black text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all cursor-pointer text-center"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-[#FF5211] text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-orange-500/10"
-                >
-                  Publish Article
-                </button>
-              </div>
-
-            </form>
-
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================
-          MODAL: EDIT EXISTING ARTICLE
-      ============================================================ */}
-      {showEditArticleModal && (
-        <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-[550px] bg-white dark:bg-[#121214] rounded-[36px] overflow-hidden shadow-2xl border border-transparent dark:border-white/10 animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
-            
-            <form onSubmit={handleEditArticleSubmit} className="flex flex-col h-full overflow-hidden">
-              
-              {/* Modal Header */}
-              <div className="px-6 py-5 border-b border-[#0A0A0A]/5 dark:border-white/10 flex items-center justify-between shrink-0 bg-white dark:bg-[#121214]">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black tracking-widest text-[#FF5211] uppercase">MODIFY SYSTEM ENTRY</span>
-                  <span className="font-bold text-sm truncate max-w-[280px]">Edit: {activeArticle?.title}</span>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => setShowEditArticleModal(false)}
-                  className="p-2 rounded-full hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-all cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Modal Scroll Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Article Title</label>
-                  <input
-                    type="text"
-                    value={articleTitle}
-                    onChange={(e) => setArticleTitle(e.target.value)}
-                    required
-                    className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Category Type</label>
-                    <select
-                      value={articleCategory}
-                      onChange={(e) => setArticleCategory(e.target.value)}
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold cursor-pointer text-slate-700 dark:text-slate-300"
-                    >
-                      <option value="Renting Tips">Renting Tips</option>
-                      <option value="City Guides">City Guides</option>
-                      <option value="Coliving">Coliving</option>
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Read Time Estimate</label>
-                    <input
-                      type="text"
-                      value={articleReadTime}
-                      onChange={(e) => setArticleReadTime(e.target.value)}
-                      required
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Author Name</label>
-                    <input
-                      type="text"
-                      value={articleAuthor}
-                      onChange={(e) => setArticleAuthor(e.target.value)}
-                      required
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Tags (Comma Separated)</label>
-                    <input
-                      type="text"
-                      value={articleTags}
-                      onChange={(e) => setArticleTags(e.target.value)}
-                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Cover Image</label>
-                  
-                  {articleImage ? (
-                    <div className="relative h-44 w-full rounded-2xl overflow-hidden border border-[#0A0A0A]/5 dark:border-white/10 group bg-neutral-100 dark:bg-neutral-900 shadow-inner">
-                      <img src={articleImage} alt="Cover Preview" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setArticleImage("")}
-                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center transition-all shadow-md cursor-pointer"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-[#0A0A0A]/10 dark:border-white/10 hover:border-[#FF5211]/40 rounded-2xl p-6 bg-[#FBFBFA] dark:bg-white/[0.01] hover:bg-[#FF5211]/5 transition-all text-center relative group">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleArticleImageUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        disabled={uploadingImage}
-                      />
-                      {uploadingImage ? (
-                        <div className="flex flex-col items-center gap-2 py-2">
-                          <div className="w-8 h-8 rounded-full border-4 border-t-[#FF5211] border-neutral-300 animate-spin" />
-                          <span className="text-[10px] font-black text-[#FF5211] uppercase tracking-wider">Uploading Image to Cloudinary...</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 pointer-events-none">
-                          <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-[#FF5211] flex items-center justify-center group-hover:scale-115 transition-transform shrink-0">
-                            <Camera size={18} />
-                          </div>
-                          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">Click or drag image file here</span>
-                          <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">PNG, JPG or WEBP up to 5MB</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Manual URL Override */}
-                  <div className="mt-1">
-                    <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase px-1">Or paste cover URL instead</span>
-                    <input
-                      type="url"
-                      value={articleImage}
-                      onChange={(e) => setArticleImage(e.target.value)}
-                      placeholder="e.g. https://images.unsplash.com/..."
-                      className="w-full h-11 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-[11px] font-bold mt-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Brief Excerpt</label>
-                  <input
-                    type="text"
-                    value={articleExcerpt}
-                    onChange={(e) => setArticleExcerpt(e.target.value)}
-                    required
-                    className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Article Body Content</label>
-                  <textarea
-                    value={articleContent}
-                    onChange={(e) => setArticleContent(e.target.value)}
-                    required
-                    className="w-full h-32 px-4 py-3 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold resize-none"
-                  />
-                </div>
-
-              </div>
-
-              {/* Modal Buttons Footer */}
-              <div className="px-6 py-5 border-t border-[#0A0A0A]/5 dark:border-white/10 bg-[#FAFAF8] dark:bg-[#121214] flex gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowEditArticleModal(false)}
-                  className="flex-1 py-3 bg-neutral-200 dark:bg-white/5 hover:bg-neutral-300 dark:hover:bg-white/10 rounded-2xl font-black text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 transition-all cursor-pointer text-center"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-3 bg-[#FF5211] text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer text-center shadow-md shadow-orange-500/10"
-                >
-                  Save Entry
-                </button>
-              </div>
-
-            </form>
-
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================
-          CONFIRM DIALOG: DELETE ARTICLE
-      ============================================================ */}
-      {showDeleteArticleDialog && (
-        <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-[420px] bg-white dark:bg-[#121214] rounded-[36px] overflow-hidden shadow-2xl border border-transparent dark:border-white/10 p-6 flex flex-col gap-6 text-center animate-in zoom-in-95 duration-200">
-            
-            <div className="w-16 h-16 rounded-full bg-red-500/5 text-red-500 flex items-center justify-center mx-auto">
-              <Trash2 size={28} />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <h3 className="font-black text-lg tracking-tight">Confirm Deletion</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
-                Are you sure you want to delete the article &ldquo;{activeArticle?.title}&rdquo;? This process cannot be undone.
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteArticleDialog(false)}
-                className="flex-1 py-3 bg-neutral-100 dark:bg-white/5 hover:bg-neutral-200 dark:hover:bg-white/10 rounded-2xl font-black text-xs uppercase tracking-wider text-[#64748b] dark:text-slate-300 transition-all cursor-pointer"
-              >
-                Keep Article
-              </button>
-              <button
-                onClick={handleDeleteArticle}
-                className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-red-500/10"
-              >
-                Delete
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -15,75 +15,36 @@ import { setCookie } from "cookies-next";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { postRequest } from "@/lib/apiCall";
+import { postRequest, getRequest } from "@/lib/apiCall";
 import { ResponseMessage, catchResponseMessage, ApiResponse } from "@/components/ResponseMessage";
 import { setUser } from "@/store/userSlice";
-import GoogleLogin from "@/components/GoogleLogin";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
-const signupSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(1, "Please confirm your password"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
-
-type AuthSchema = {
-  name?: string;
-  email: string;
-  password: string;
-  confirmPassword?: string;
-};
-
-type Tab = "login" | "signup";
+type LoginSchema = z.infer<typeof loginSchema>;
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useDispatch();
 
-  const [tab, setTab] = useState<Tab>((searchParams.get("tab") as Tab) || "login");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors },
-  } = useForm<AuthSchema>({
-    resolver: zodResolver(tab === "login" ? loginSchema : signupSchema),
+  } = useForm<LoginSchema>({
+    resolver: zodResolver(loginSchema),
     defaultValues: {
-      name: "",
       email: "",
       password: "",
-      confirmPassword: "",
     },
   });
-
-  useEffect(() => {
-    const tabParam = searchParams.get("tab") as Tab;
-    if (tabParam && (tabParam === "login" || tabParam === "signup")) {
-      setTab(tabParam);
-    }
-  }, [searchParams]);
-
-  const handleTabChange = (newTab: Tab) => {
-    setTab(newTab);
-    reset();
-    // Update URL without refresh
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", newTab);
-    window.history.pushState({}, "", url);
-  };
 
   const verifyToken = async (token: string, userData?: any) => {
     if (token) {
@@ -92,7 +53,18 @@ function LoginContent() {
         setCookie("drive_access_token", token, { path: '/' });
 
         if (res.success) {
-          dispatch(setUser(res.data?.user || res.data || userData));
+          // Fetch the full admin profile after token verification
+          let adminData = res.data?.user || res.data || userData;
+          try {
+            const profileRes = await getRequest<any>("/admin/profile");
+            if (profileRes.success && profileRes.data) {
+              adminData = profileRes.data.user || profileRes.data;
+            }
+          } catch (profileErr) {
+            console.error("Failed to fetch admin profile during token verification:", profileErr);
+          }
+
+          dispatch(setUser(adminData));
           const redirect = searchParams.get("redirect");
           router.push(redirect || "/");
         } else {
@@ -104,28 +76,16 @@ function LoginContent() {
     }
   };
 
-  const onSubmit = async (data: AuthSchema) => {
+  const onSubmit = async (data: LoginSchema) => {
     setLoading(true);
     try {
-      if (tab === "login") {
-        const res = await postRequest<ApiResponse<any>>("/auth/login", {
-          email: data.email,
-          password: data.password,
-        });
-        ResponseMessage(res);
-        if (res.success && res.data?.accessToken) {
-          await verifyToken(res.data.accessToken, res.data.user || res.data);
-        }
-      } else {
-        const res = await postRequest<ApiResponse<any>>("/auth/register", {
-          name: data.name,
-          email: data.email,
-          password: data.password,
-        });
-        ResponseMessage(res);
-        if (res.success) {
-          handleTabChange("login");
-        }
+      const res = await postRequest<ApiResponse<any>>("/auth/login", {
+        email: data.email,
+        password: data.password,
+      });
+      ResponseMessage(res);
+      if (res.success && res.data?.accessToken) {
+        await verifyToken(res.data.accessToken, res.data.user || res.data);
       }
     } catch (err) {
       catchResponseMessage(err);
@@ -156,39 +116,8 @@ function LoginContent() {
             <p className="text-brand-text-primary/35 text-[13px] font-medium">Find your perfect stay</p>
           </div>
 
-          {/* Tab Switcher */}
-          <div className="flex bg-brand-surface rounded-2xl p-1 gap-1 border border-black/5 dark:border-white/10">
-            {(["login", "signup"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => handleTabChange(t)}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold capitalize transition-all duration-300 ${tab === t
-                  ? 'bg-brand-primary text-white shadow-[0_4px_20px_rgba(255,82,17,0.35)]'
-                  : 'text-brand-text-primary/40 hover:text-brand-text-primary/70'
-                  }`}
-              >
-                {t === 'login' ? 'Sign In' : 'Sign Up'}
-              </button>
-            ))}
-          </div>
-
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5">
-
-            {/* Name - Signup Only */}
-            {tab === 'signup' && (
-              <div className="flex flex-col gap-1.5">
-                <div className="relative group">
-                  <UserIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
-                  <Input
-                    {...register("name")}
-                    placeholder="Full name"
-                    className={`w-full bg-brand-surface border ${errors.name ? 'border-red-500/50' : 'border-black/10 dark:border-white/20'} rounded-2xl pl-11 pr-4 py-6 text-brand-text-primary text-sm placeholder:text-brand-text-primary/25 focus:outline-none focus:ring-0 focus:border-brand-primary/60 focus:bg-brand-surface-elevated transition-all`}
-                  />
-                </div>
-                {errors.name && <span className="text-[11px] text-red-500/80 ml-4">{errors.name.message}</span>}
-              </div>
-            )}
 
             {/* Email */}
             <div className="flex flex-col gap-1.5">
@@ -224,37 +153,12 @@ function LoginContent() {
               </div>
               {errors.password && <span className="text-[11px] text-red-500/80 ml-4">{errors.password.message}</span>}
 
-              {tab === 'login' && (
-                <div className="flex justify-end pr-1">
-                  <Link href="/forgot-password" className="text-[11px] font-bold text-brand-primary hover:text-brand-primary/80 transition-colors">
-                    Forgot password?
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            {/* Confirm Password - Signup Only */}
-            {tab === 'signup' && (
-              <div className="flex flex-col gap-1.5">
-                <div className="relative group">
-                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 group-focus-within:text-brand-primary transition-colors pointer-events-none" />
-                  <Input
-                    {...register("confirmPassword")}
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm password"
-                    className={`w-full bg-brand-surface border ${errors.confirmPassword ? 'border-red-500/50' : 'border-black/10 dark:border-white/20'} rounded-2xl pl-11 pr-12 py-6 text-brand-text-primary text-sm placeholder:text-brand-text-primary/25 focus:outline-none focus:ring-0 focus:border-brand-primary/60 focus:bg-brand-surface-elevated transition-all`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-text-primary/30 hover:text-brand-primary transition-colors"
-                  >
-                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-                {errors.confirmPassword && <span className="text-[11px] text-red-500/80 ml-4">{errors.confirmPassword.message}</span>}
+              <div className="flex justify-end pr-1">
+                <Link href="/forgot-password" className="text-[11px] font-bold text-brand-primary hover:text-brand-primary/80 transition-colors">
+                  Forgot password?
+                </Link>
               </div>
-            )}
+            </div>
 
             {/* Submit Button */}
             <Button
@@ -265,25 +169,14 @@ function LoginContent() {
               {loading ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={18} />
-                  <span>{tab === 'signup' ? 'Creating account...' : 'Signing in...'}</span>
+                  <span>Signing in...</span>
                 </div>
               ) : (
-                tab === 'signup' ? 'Create Account' : 'Sign In'
+                'Sign In'
               )}
             </Button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-brand-glass-border" />
-            <span className="text-brand-text-primary/25 text-xs font-semibold uppercase tracking-widest">or</span>
-            <div className="flex-1 h-px bg-brand-glass-border" />
-          </div>
-
-          {/* Google Sign-in */}
-          <div className="w-full">
-            <GoogleLogin />
-          </div>
 
           {/* Trust Pills */}
           <div className="flex justify-center gap-3 pt-1">

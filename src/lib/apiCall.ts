@@ -135,3 +135,33 @@ export async function deleteRequest<T = unknown>(
   }
   return responseData;
 }
+
+export async function putRequest<T = unknown>(
+  endpoint: string,
+  data?: unknown
+): Promise<T> {
+  const token = retrieveToken();
+
+  const res = await fetch(`${baseURL}${endpoint}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: data ? JSON.stringify(data) : undefined,
+    cache: "no-store",
+  });
+
+  let responseData;
+
+  try {
+    responseData = await res.json();
+  } catch {
+    responseData = null;
+  }
+
+  if (!res.ok) {
+    throw new Error(responseData?.message || "PUT request failed");
+  }
+  return responseData;
+}

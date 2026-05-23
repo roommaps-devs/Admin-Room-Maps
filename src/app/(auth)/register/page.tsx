@@ -7,7 +7,7 @@ export default function RegisterRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/login?tab=signup");
+    router.replace("/login");
   }, [router]);
 
   return null;

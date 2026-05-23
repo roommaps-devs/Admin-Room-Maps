@@ -1,4 +1,4 @@
-import AdminDashboard from "@/components/AdminDashboard";
+import AdminPageClient from "@/components/AdminPageClient";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default function AdminPage() {
   return (
     <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#0A0A0A]">
-      <AdminDashboard />
+      <AdminPageClient />
     </div>
   );
 }

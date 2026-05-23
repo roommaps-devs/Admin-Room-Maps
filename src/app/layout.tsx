@@ -71,11 +71,6 @@ export default function RootLayout({
     <Toaster />
 
   </StoreProvider>
-
-  <Script
-    src="https://accounts.google.com/gsi/client"
-    strategy="beforeInteractive"
-  />
 </body>
     </html>
   );

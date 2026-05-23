@@ -27,8 +27,16 @@ export default function Header() {
   const openProfileMenu = () => dispatch(setProfileMenu(true));
   const closeProfileMenu = () => dispatch(setProfileMenu(false));
 
-  // Hide header on auth pages and map page
-  if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/map") return null;
+  // Hide header on auth pages, map page, and root page when unauthenticated
+  if (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/map" ||
+    (pathname === "/" && !isAuthenticated)
+  ) {
+    return null;
+  }
 
   return (
     <Navbar

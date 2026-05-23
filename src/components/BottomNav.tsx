@@ -24,7 +24,8 @@ export default function BottomNav() {
     pathname?.startsWith('/login') || 
     pathname?.startsWith('/register') || 
     pathname?.startsWith('/forgot-password') ||
-    pathname === '/map';
+    pathname === '/map' ||
+    (pathname === '/' && !user);
 
   if (shouldHide) return null;
 
