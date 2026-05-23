@@ -20,6 +20,10 @@ export const metadata: Metadata = {
 };
 
 import StoreProvider from "@/store/StoreProvider";
+import Header from "@/components/Header";
+import BottomNav from "@/components/BottomNav";
+import GlobalLoader from "@/components/GlobalLoader";
+import TesterWelcomePopup from "@/components/TesterWelcomePopup";
 
 export default function RootLayout({
   children,
@@ -31,13 +35,43 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* <body className="min-h-full flex flex-col">
         <StoreProvider>
-          {children}
+          <Header />
+          
+          <main className="flex-1">{children}</main>
+          <Footer />
+          <BottomNav />
           <Toaster />
         </StoreProvider>
         <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />
-      </body>
+      </body> */}
+
+      <body className="min-h-screen flex flex-col">
+  <StoreProvider>
+
+    {/* Global Route Loader */}
+    <GlobalLoader />
+
+    {/* Tester Welcome Popup (Only shows first time) */}
+    <TesterWelcomePopup />
+
+    {/* Header */}
+    <Header />
+
+    {/* Main Content */}
+    <main className="flex-1 pt-[80px]">
+      {children}
+    </main>
+
+    {/* Mobile Bottom Nav */}
+    <BottomNav />
+
+    {/* Toast */}
+    <Toaster />
+
+  </StoreProvider>
+</body>
     </html>
   );
 }
