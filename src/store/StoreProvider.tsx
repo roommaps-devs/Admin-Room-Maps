@@ -19,7 +19,7 @@ function AuthInitializer({ children }: { children: ReactNode }) {
 
       if (token) {
         try {
-          const res = await postRequest<any>("/auth/verify", { accessToken: token });
+          const res = await postRequest<any>("/admin/verify", { accessToken: token });
           if (res.success) {
             // Fetch the full admin profile after token verification
             let adminData = res.data?.user || res.data;
@@ -29,7 +29,7 @@ function AuthInitializer({ children }: { children: ReactNode }) {
                 adminData = profileRes.data.user || profileRes.data;
               }
             } catch (profileErr) {
-              console.error("Failed to fetch admin profile during initAuth:", profileErr);
+              console.warn("Failed to fetch admin profile during initAuth:", profileErr);
             }
 
             dispatch(setUser(adminData));
@@ -38,7 +38,7 @@ function AuthInitializer({ children }: { children: ReactNode }) {
             dispatch(clearUser());
           }
         } catch (error) {
-          console.error("Auth verification failed:", error);
+          console.warn("Auth verification failed:", error);
           dispatch(clearUser());
         }
       } else {

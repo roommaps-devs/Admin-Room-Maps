@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { postRequest, getRequest } from "@/lib/apiCall";
 import { ResponseMessage, catchResponseMessage, ApiResponse } from "@/components/ResponseMessage";
-import { setUser } from "@/store/userSlice";
+import { clearUser, setUser } from "@/store/userSlice";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -46,54 +46,115 @@ function LoginContent() {
     },
   });
 
-  const verifyToken = async (token: string, userData?: any) => {
-    if (token) {
-      try {
-        const res = await postRequest<ApiResponse<any>>("/auth/verify", { accessToken: token });
-        setCookie("drive_access_token", token, { path: '/' });
+const verifyToken = async (token: string, userData?: any) => {
+  if (!token) return;
 
-        if (res.success) {
-          // Fetch the full admin profile after token verification
-          let adminData = res.data?.user || res.data || userData;
-          try {
-            const profileRes = await getRequest<any>("/admin/profile");
-            if (profileRes.success && profileRes.data) {
-              adminData = profileRes.data.user || profileRes.data;
-            }
-          } catch (profileErr) {
-            console.error("Failed to fetch admin profile during token verification:", profileErr);
-          }
-
-          dispatch(setUser(adminData));
-          const redirect = searchParams.get("redirect");
-          router.push(redirect || "/");
-        } else {
-          router.push("/login");
-        }
-      } catch (err) {
-        console.error("Token verification failed:", err);
+  try {
+    const res = await postRequest<ApiResponse<any>>(
+      "/admin/verify",
+      {
+        accessToken: token,
       }
-    }
-  };
+    );
 
-  const onSubmit = async (data: LoginSchema) => {
-    setLoading(true);
+    // If not authorized
+    if (!res.success) {
+      ResponseMessage(res);
+
+      // Remove token
+      setCookie("drive_access_token", "", {
+        path: "/",
+        maxAge: 0,
+      });
+
+      // Clear redux user
+      dispatch(clearUser());
+
+      router.push("/login");
+      return;
+    }
+
+    // Save token only for admin
+    setCookie("drive_access_token", token, {
+      path: "/",
+    });
+
+    // Fetch full admin profile
+    let adminData = res.data?.user || res.data || userData;
+
     try {
-      const res = await postRequest<ApiResponse<any>>("/auth/login", {
+      const profileRes = await getRequest<any>("/admin/profile");
+
+      if (profileRes.success && profileRes.data) {
+        adminData = profileRes.data.user || profileRes.data;
+      }
+    } catch (profileErr) {
+      console.warn(
+        "Failed to fetch admin profile:",
+        profileErr
+      );
+    }
+
+    // Save admin in redux
+    dispatch(setUser(adminData));
+
+    // Success message only for admin
+    ResponseMessage({
+      success: true,
+      message: "Admin logged in successfully",
+    });
+
+    const redirect = searchParams.get("redirect");
+
+    router.push(redirect || "/");
+
+  } catch (err: any) {
+    console.warn("Token verification failed:", err);
+
+    catchResponseMessage(err);
+
+    // Remove token
+    setCookie("drive_access_token", "", {
+      path: "/",
+      maxAge: 0,
+    });
+
+    dispatch(clearUser());
+
+    router.push("/login");
+  }
+};
+
+const onSubmit = async (data: LoginSchema) => {
+  setLoading(true);
+
+  try {
+    const res = await postRequest<ApiResponse<any>>(
+      "/auth/login",
+      {
         email: data.email,
         password: data.password,
-      });
-      ResponseMessage(res);
-      if (res.success && res.data?.accessToken) {
-        await verifyToken(res.data.accessToken, res.data.user || res.data);
       }
-    } catch (err) {
-      catchResponseMessage(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    );
 
+    // DO NOT show success here
+    // because admin verification is pending
+
+    if (res.success && res.data?.accessToken) {
+      await verifyToken(
+        res.data.accessToken,
+        res.data.user || res.data
+      );
+    } else {
+      ResponseMessage(res);
+    }
+
+  } catch (err) {
+    catchResponseMessage(err);
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="relative min-h-screen w-full bg-background flex items-center justify-center p-6 overflow-hidden">
 
