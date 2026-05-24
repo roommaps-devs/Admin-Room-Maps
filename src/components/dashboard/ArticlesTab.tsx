@@ -30,6 +30,8 @@ export default function ArticlesTab({
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editCategoryValue, setEditCategoryValue] = useState("");
 
   // Articles state
   const [articles, setArticles] = useState<Article[]>([]);
@@ -140,6 +142,7 @@ export default function ArticlesTab({
 
     try {
       const res = await postRequest<{ success: boolean; message?: string; data?: any }>("/admin/article/category", {
+        id: 0,
         name: trimmed
       });
 
@@ -165,6 +168,56 @@ export default function ArticlesTab({
     } catch (err: any) {
       console.error("Error adding category:", err);
       toast.error(err.message || "Failed to add category");
+    }
+  };
+
+  const handleSaveCategoryEdit = async (oldName: string) => {
+    const trimmed = editCategoryValue.trim();
+    if (!trimmed || trimmed.toLowerCase() === oldName.toLowerCase()) {
+      setEditingCategory(null);
+      return;
+    }
+
+    if (categories.some(c => c.toLowerCase() === trimmed.toLowerCase() && c.toLowerCase() !== oldName.toLowerCase())) {
+      toast.error("Category already exists!");
+      setEditingCategory(null);
+      return;
+    }
+
+    const id = categoryMap[oldName.toLowerCase()];
+    if (!id) {
+      toast.error("Cannot edit: category ID not found.");
+      setEditingCategory(null);
+      return;
+    }
+
+    try {
+      const res = await postRequest<{ success: boolean; message?: string; data?: any }>("/admin/article/category", {
+        id: id,
+        name: trimmed
+      });
+
+      if (res && res.success) {
+        setCategories(prev => prev.map(c => c.toLowerCase() === oldName.toLowerCase() ? trimmed : c));
+        setCategoryMap(prev => {
+          const next = { ...prev };
+          delete next[oldName.toLowerCase()];
+          next[trimmed.toLowerCase()] = id;
+          return next;
+        });
+
+        // Re-fetch articles to ensure the category name updates in the listings
+        fetchArticles();
+
+        toast.success(res.message || "Category updated successfully!");
+      } else {
+        toast.error(res?.message || "Failed to update category");
+      }
+    } catch (err: any) {
+      console.error("Error editing category:", err);
+      toast.error(err.message || "Failed to update category");
+    } finally {
+      setEditingCategory(null);
     }
   };
 
@@ -290,23 +343,54 @@ export default function ArticlesTab({
         <div className="flex flex-wrap gap-2.5">
           {categories.map((cat) => {
             const count = articles.filter(a => a.category?.toLowerCase() === cat.toLowerCase()).length;
+            const isEditing = editingCategory === cat;
 
             return (
               <div
                 key={cat}
                 className="group/badge flex items-center gap-2.5 pl-4 pr-3 py-2 bg-[#F3F4F6] dark:bg-white/5 border border-transparent dark:border-white/[0.03] rounded-2xl text-[12px] font-black tracking-tight text-slate-800 dark:text-slate-200 transition-all hover:bg-neutral-200/50 dark:hover:bg-white/10 hover:scale-[1.01]"
               >
-                <span>{cat}</span>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editCategoryValue}
+                    onChange={(e) => setEditCategoryValue(e.target.value)}
+                    onBlur={() => handleSaveCategoryEdit(cat)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveCategoryEdit(cat);
+                      if (e.key === "Escape") setEditingCategory(null);
+                    }}
+                    className="bg-transparent border-b border-[#FF5211] outline-none text-[12px] font-black text-slate-800 dark:text-slate-200 w-24"
+                    autoFocus
+                  />
+                ) : (
+                  <span>{cat}</span>
+                )}
                 <span className="bg-[#FF5211]/10 dark:bg-[#FF5211]/20 text-[#FF5211] text-[10px] px-2 py-0.5 rounded-lg font-black min-w-6 text-center">
                   {count}
                 </span>
-                <button
-                  onClick={() => handleDeleteCategory(cat)}
-                  className="text-slate-400 hover:text-red-500 transition-colors p-0.5 rounded-md cursor-pointer ml-1 opacity-60 hover:opacity-100"
-                  title={`Delete "${cat}" category`}
-                >
-                  <Trash2 size={13} />
-                </button>
+
+                {!isEditing && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingCategory(cat);
+                        setEditCategoryValue(cat);
+                      }}
+                      className="text-slate-400 hover:text-blue-500 transition-colors p-0.5 rounded-md cursor-pointer opacity-0 group-hover/badge:opacity-60 hover:!opacity-100"
+                      title={`Rename "${cat}" category`}
+                    >
+                      <Edit3 size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(cat)}
+                      className="text-slate-400 hover:text-red-500 transition-colors p-0.5 rounded-md cursor-pointer opacity-60 hover:opacity-100"
+                      title={`Delete "${cat}" category`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
