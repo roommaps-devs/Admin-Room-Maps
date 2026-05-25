@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Building2, PieChart, AlertTriangle, BookOpen } from "lucide-react";
+import { LayoutDashboard, Building2, PieChart, AlertTriangle, BookOpen, Users } from "lucide-react";
 
-type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles";
+type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles" | "users";
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -11,6 +11,7 @@ interface DashboardSidebarProps {
   roomsCount: number;
   reportsCount: number;
   articlesCount: number;
+  usersCount: number;
   user: any;
 }
 
@@ -20,6 +21,7 @@ export default function DashboardSidebar({
   roomsCount,
   reportsCount,
   articlesCount,
+  usersCount,
   user
 }: DashboardSidebarProps) {
   return (
@@ -115,6 +117,23 @@ export default function DashboardSidebar({
               activeTab === "articles" ? "bg-white/20 text-white" : "bg-[#F3F4F6] dark:bg-white/10 text-[#64748b]"
             }`}>
               {articlesCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl text-[13px] font-black tracking-wide uppercase transition-all duration-300 cursor-pointer ${
+              activeTab === "users" 
+                ? "bg-[#FF5211] text-white shadow-lg shadow-orange-500/20" 
+                : "text-[#64748b] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F3F4F6] dark:hover:bg-white/5"
+            }`}
+          >
+            <Users size={18} />
+            Users
+            <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              activeTab === "users" ? "bg-white/20 text-white" : "bg-[#F3F4F6] dark:bg-white/10 text-[#64748b]"
+            }`}>
+              {usersCount}
             </span>
           </button>
         </nav>

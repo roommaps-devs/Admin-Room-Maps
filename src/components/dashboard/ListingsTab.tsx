@@ -143,13 +143,14 @@ export default function ListingsTab({
                 <th className="py-4.5 px-6 text-[10px] font-black tracking-wider uppercase text-slate-500">Category</th>
                 <th className="py-4.5 px-6 text-[10px] font-black tracking-wider uppercase text-slate-500">Rent price</th>
                 <th className="py-4.5 px-6 text-[10px] font-black tracking-wider uppercase text-slate-500">Owner</th>
+                <th className="py-4.5 px-6 text-[10px] font-black tracking-wider uppercase text-slate-500">Created at</th>
                 <th className="py-4.5 px-6 text-[10px] font-black tracking-wider uppercase text-slate-500 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#0A0A0A]/5 dark:divide-white/10">
               {loadingRooms ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col gap-2 items-center">
                       <RefreshCw className="animate-spin text-[#FF5211]" size={24} />
                       <span className="text-xs font-bold uppercase tracking-wider">Loading listings record database...</span>
@@ -158,7 +159,7 @@ export default function ListingsTab({
                 </tr>
               ) : filteredRooms.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-black text-xs uppercase tracking-wide">
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-black text-xs uppercase tracking-wide">
                     No listings match the filter settings.
                   </td>
                 </tr>
@@ -187,7 +188,7 @@ export default function ListingsTab({
                           </div>
                         </div>
                       </td>
-
+ 
                       {/* Location Cell */}
                       <td className="py-4 px-6">
                         <div className="flex flex-col gap-0.5 min-w-0">
@@ -195,7 +196,7 @@ export default function ListingsTab({
                           <span className="text-[10px] opacity-40 font-semibold truncate max-w-[150px]">{room.location || "Sector Area"}</span>
                         </div>
                       </td>
-
+ 
                       {/* Category badge */}
                       <td className="py-4 px-6">
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
@@ -208,12 +209,12 @@ export default function ListingsTab({
                           {categoryName}
                         </span>
                       </td>
-
+ 
                       {/* Price */}
                       <td className="py-4 px-6 font-black text-[13px] text-[#0A0A0A] dark:text-white">
                         ₹{formattedPrice}
                       </td>
-
+ 
                       {/* Owner */}
                       <td className="py-4 px-6">
                         <div className="flex flex-col gap-0.5">
@@ -227,6 +228,15 @@ export default function ListingsTab({
                         </div>
                       </td>
 
+                      {/* Created At Date */}
+                      <td className="py-4 px-6 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {room.createdAt ? new Date(room.createdAt).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric"
+                        }) : "—"}
+                      </td>
+ 
                       {/* Actions Button Cells */}
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-2.5">
@@ -257,7 +267,7 @@ export default function ListingsTab({
                           </button>
                         </div>
                       </td>
-
+ 
                     </tr>
                   );
                 })
