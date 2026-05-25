@@ -35,6 +35,15 @@ export function resolveImageUrl(url: string | undefined): string {
   if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
     return cleanUrl;
   }
+
+  // Prefix with NEXT_PUBLIC_IMAGE_URL if configured (e.g. Cloudinary base URL)
+  const imageBase = process.env.NEXT_PUBLIC_IMAGE_URL;
+  if (imageBase) {
+    const base = imageBase.endsWith('/') ? imageBase : `${imageBase}/`;
+    const path = cleanUrl.startsWith('/') ? cleanUrl.substring(1) : cleanUrl;
+    return `${base}${path}`;
+  }
+
   const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend-room-maps.onrender.com').replace(/\/api\/?$/, '');
   const path = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
   return `${backendBase}${path}`;
@@ -63,29 +72,55 @@ export function useRooms() {
       // Instantiate a unified promise so all concurrent useRooms mounts share this exact network request
       roomsPromise = (async () => {
         try {
-          const res = await getRequest<{ success: boolean; data: any[] }>("/post/getAll");
-          if (res && res.success && Array.isArray(res.data)) {
-            const mappedRooms: Room[] = res.data.map((item: any) => {
-              const rawImg = item.images?.[0]?.uploadUrl || item.images?.[0]?.url || (typeof item.images?.[0] === 'string' ? item.images[0] : null) || item.image;
+          const res = await getRequest<any>("/admin/posts");
+          
+          let rawData: any[] = [];
+          if (Array.isArray(res)) {
+            rawData = res;
+          } else if (res && Array.isArray(res.data)) {
+            rawData = res.data;
+          } else if (res && Array.isArray(res.posts)) {
+            rawData = res.posts;
+          } else if (res && res.success && Array.isArray(res.data)) {
+            rawData = res.data;
+          }
+
+          if (rawData.length > 0 || (res && (Array.isArray(res) || res.success))) {
+            const mappedRooms: Room[] = rawData.map((item: any) => {
+              const firstImageObj = item.images?.[0];
+              const rawImg = firstImageObj?.uploadUrl || 
+                             firstImageObj?.url || 
+                             (typeof firstImageObj === 'string' ? firstImageObj : null) || 
+                             item.image || 
+                             item.imageUrl;
+
+              const imagesList = Array.isArray(item.images)
+                ? item.images.map((img: any) => 
+                    typeof img === 'string' ? img : (img.uploadUrl || img.url)
+                  ).filter(Boolean)
+                : [];
+
               return {
-                id: item.id || item.postId || Math.random().toString(),
+                id: item.id || item._id || item.postId || String(item.createdAt || Math.random()),
                 name: item.name || item.title || 'Room Listing',
                 city: item.city || 'Chandigarh',
+                state: item.state || 'Punjab',
                 rent: Number(item.rent) || 10000,
                 lat: Number(item.lat) || 30.7333,
                 lng: Number(item.lng) || 76.7794,
                 category: String(item.category || 'rent').toLowerCase(),
                 type: item.type || item.propertyType || 'Room',
                 image: resolveImageUrl(rawImg),
-                images: item.images ? item.images.map((img: any) => typeof img === 'string' ? img : (img.uploadUrl || img.url)).filter(Boolean) : [],
-                location: item.address || item.location,
+                images: imagesList,
+                location: item.location || item.address || [item.city, item.state].filter(Boolean).join(', ') || 'Sector Area',
                 isTrending: !!item.isTrending,
-                owner: item.owner,
-                phone: item.phone,
+                owner: item.owner || 'Anonymous',
+                phone: item.phone || '',
                 amenities: item.amenities || [],
-                furnished: item.furnished,
-                bhk: item.bhk,
-                gender: item.gender
+                furnished: item.furnished || 'Unfurnished',
+                bhk: item.bhk || '1 BHK',
+                gender: item.gender,
+                createdAt: item.createdAt
               };
             });
             cachedRooms = mappedRooms;

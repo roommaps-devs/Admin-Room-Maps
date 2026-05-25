@@ -17,9 +17,10 @@ import ListingsTab from "./dashboard/ListingsTab";
 import AnalyticsTab from "./dashboard/AnalyticsTab";
 import ReportsTab from "./dashboard/ReportsTab";
 import ArticlesTab from "./dashboard/ArticlesTab";
+import UsersTab from "./dashboard/UsersTab";
 import { ResponseMessage, ApiResponse, catchResponseMessage } from "./ResponseMessage";
 
-type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles";
+type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles" | "users";
 
 interface ActivityLog {
   id: string;
@@ -44,6 +45,26 @@ export default function AdminDashboard() {
   
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch users on component mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const res = await getRequest<any>("/admin/users");
+        if (res && res.success && Array.isArray(res.data)) {
+          setUsers(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch users from backend:", err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  }, []);
   
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -260,6 +281,7 @@ export default function AdminDashboard() {
           roomsCount={rooms.length}
           reportsCount={reports.length}
           articlesCount={10}
+          usersCount={users.length}
           user={user}
         />
 
@@ -308,6 +330,18 @@ export default function AdminDashboard() {
           {activeTab === "articles" && (
             <ArticlesTab
               adminName={user?.name || "Admin Staff"}
+            />
+          )}
+
+          {/* ---- USERS TAB ---- */}
+          {activeTab === "users" && (
+            <UsersTab
+              users={users}
+              loadingUsers={loadingUsers}
+              onDeleteUserClick={(user) => {
+                setUsers(prev => prev.filter(u => u.email !== user.email));
+                toast.success(`User ${user.name || user.email} access revoked successfully!`);
+              }}
             />
           )}
 
