@@ -5,7 +5,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { X, Trash2, Camera } from "lucide-react";
 import { useRooms, clearRoomsCache } from "@/lib/hooks/useRooms";
-import { Room } from "@/lib/types";
+import { Room, PostStatus } from "@/lib/types";
 import { postRequest, deleteRequest, uploadRequest, getRequest } from "@/lib/apiCall";
 import { toast } from "sonner";
 import PostListingForm from "./map/PostListingForm";
@@ -18,9 +18,10 @@ import AnalyticsTab from "./dashboard/AnalyticsTab";
 import ReportsTab from "./dashboard/ReportsTab";
 import ArticlesTab from "./dashboard/ArticlesTab";
 import UsersTab from "./dashboard/UsersTab";
+import NotificationsTab from "./dashboard/NotificationsTab";
 import { ResponseMessage, ApiResponse, catchResponseMessage } from "./ResponseMessage";
 
-type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles" | "users";
+type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles" | "users" | "notifications";
 
 interface ActivityLog {
   id: string;
@@ -42,7 +43,7 @@ interface Report {
 export default function AdminDashboard() {
   const { user } = useSelector((state: RootState) => state.user);
   const { data: fetchedRooms, isLoading: loadingRooms } = useRooms();
-  
+
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [rooms, setRooms] = useState<Room[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -65,7 +66,25 @@ export default function AdminDashboard() {
     };
     fetchUsers();
   }, []);
-  
+
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  // Fetch initial notifications count on mount
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await getRequest<any>("/admin/notification/get-all");
+        if (res && res.success && res.data && Array.isArray(res.data.notifications)) {
+          const count = res.data.notifications.filter((n: any) => !n.is_read).length;
+          setUnreadNotificationsCount(count);
+        }
+      } catch (err) {
+        console.error("Failed to fetch initial unread notifications count:", err);
+      }
+    };
+    fetchUnreadCount();
+  }, []);
+
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -82,6 +101,7 @@ export default function AdminDashboard() {
   const [editPhone, setEditPhone] = useState("");
   const [editOwner, setEditOwner] = useState("");
   const [editAddress, setEditAddress] = useState("");
+  const [editStatus, setEditStatus] = useState<string>("ACTIVE");
 
 
 
@@ -93,12 +113,72 @@ export default function AdminDashboard() {
     { id: "4", type: "add", message: "New Host Stay 'Shanti Villa PG' added by Administrator", time: "5 hours ago" }
   ]);
 
-  // Listing reports mock data
-  const [reports, setReports] = useState<Report[]>([
-    { id: "rep-1", postId: "room-1", title: "Luxury Stay near Cyber City", reporter: "Aman V.", reason: "Fake photos uploaded. The property is outdated.", date: "May 22, 2026", status: "pending" },
-    { id: "rep-2", postId: "room-2", title: "Standard 2BHK in Gachibowli", reporter: "Saira K.", reason: "Broker contact instead of direct owner listing.", date: "May 21, 2026", status: "pending" },
-    { id: "rep-3", postId: "room-3", title: "Coliving Room in Indiranagar", reporter: "Vikram S.", reason: "Rent price is 25,000 instead of 18,000 listed.", date: "May 20, 2026", status: "pending" }
-  ]);
+  // Listing reports state variables
+  const [reportsStatus, setReportsStatus] = useState<"PENDING" | "REVIEWED" | "REJECTED">("PENDING");
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportsTotalPages, setReportsTotalPages] = useState(1);
+  const [reportsCounts, setReportsCounts] = useState<Record<string, number>>({
+    PENDING: 0,
+    REVIEWED: 0,
+    REJECTED: 0,
+  });
+  const [reports, setReports] = useState<any[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+  const [localReportStatuses, setLocalReportStatuses] = useState<Record<string, "PENDING" | "REVIEWED" | "REJECTED">>({});
+
+  // Dynamic reports fetching from real backend
+  const fetchReports = async () => {
+    setIsLoadingReports(true);
+    try {
+      const res = await getRequest<any>(`/admin/report/getReportsByStatus?status=${reportsStatus}&page=${reportsPage}&limit=10`);
+      if (res && res.success && res.data) {
+        const rawReports = res.data.reports || [];
+
+        // Apply session overrides
+        const processedReports = rawReports.map((r: any) => {
+          if (localReportStatuses[r.id]) {
+            return { ...r, status: localReportStatuses[r.id] };
+          }
+          return r;
+        }).filter((r: any) => r.status === reportsStatus);
+
+        setReports(processedReports);
+
+        // Synchronize counts from backend statusCounts
+        const counts = { PENDING: 0, REVIEWED: 0, REJECTED: 0 };
+        if (res.data.statusCounts) {
+          counts.PENDING = res.data.statusCounts.PENDING || 0;
+          counts.REVIEWED = res.data.statusCounts.REVIEWED || 0;
+          counts.REJECTED = res.data.statusCounts.REJECTED || 0;
+        }
+
+        // Adjust counts locally to reflect session status changes instantly
+        Object.entries(localReportStatuses).forEach(([id, status]) => {
+          // If a report was moved out of its original status locally
+          // We look at raw reports to adjust backend base counts
+          const foundRaw = rawReports.find((rr: any) => rr.id === id);
+          if (foundRaw && foundRaw.status !== status) {
+            // Subtract from original status
+            const orig = foundRaw.status as keyof typeof counts;
+            if (counts[orig] !== undefined) counts[orig] = Math.max(0, counts[orig] - 1);
+            // Add to new status
+            if (counts[status] !== undefined) counts[status] += 1;
+          }
+        });
+
+        setReportsCounts(counts);
+        setReportsTotalPages(res.data.totalPages || 1);
+      }
+    } catch (err) {
+      console.error("Failed to fetch reports from backend:", err);
+    } finally {
+      setIsLoadingReports(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, [reportsStatus, reportsPage, localReportStatuses]);
 
   // Sync state with fetched rooms
   useEffect(() => {
@@ -110,10 +190,10 @@ export default function AdminDashboard() {
   // Toggle Trending
   const handleToggleTrending = async (room: Room) => {
     const updatedStatus = !room.isTrending;
-    
+
     // Update local state optimistically
     setRooms(prev => prev.map(r => r.id === room.id ? { ...r, isTrending: updatedStatus } : r));
-    
+
     // Log Activity
     setActivityLogs(prev => [
       {
@@ -124,7 +204,7 @@ export default function AdminDashboard() {
       },
       ...prev
     ]);
-    
+
     try {
       const res = await postRequest<ApiResponse>(`/post/updateTrending/${room.id}`, { isTrending: updatedStatus });
       ResponseMessage(res);
@@ -143,12 +223,12 @@ export default function AdminDashboard() {
   // Perform Delete
   const handleDeleteListing = async () => {
     if (!activeRoom) return;
-    
+
     const id = activeRoom.id;
     // Optimistic Update
     setRooms(prev => prev.filter(r => r.id !== id));
     setShowDeleteDialog(false);
-    
+
     // Log Activity
     setActivityLogs(prev => [
       {
@@ -159,8 +239,8 @@ export default function AdminDashboard() {
       },
       ...prev
     ]);
-    
-    
+
+
     try {
       const res = await deleteRequest<ApiResponse>(`/post/delete/${id}`);
       ResponseMessage(res);
@@ -183,6 +263,7 @@ export default function AdminDashboard() {
     setEditPhone(room.phone || "");
     setEditOwner(room.owner || "");
     setEditAddress(room.location || "");
+    setEditStatus(room.status ? String(room.status).toUpperCase() : "ACTIVE");
     setShowEditModal(true);
   };
 
@@ -190,7 +271,7 @@ export default function AdminDashboard() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeRoom) return;
-    
+
     const updated: Room = {
       ...activeRoom,
       name: editTitle,
@@ -201,13 +282,14 @@ export default function AdminDashboard() {
       furnished: editFurnished,
       phone: editPhone,
       owner: editOwner,
-      location: editAddress
+      location: editAddress,
+      status: editStatus as PostStatus
     };
-    
+
     // Update local state optimistically
     setRooms(prev => prev.map(r => r.id === activeRoom.id ? updated : r));
     setShowEditModal(false);
-    
+
     // Log Activity
     setActivityLogs(prev => [
       {
@@ -218,7 +300,7 @@ export default function AdminDashboard() {
       },
       ...prev
     ]);
-    
+
     try {
       const res = await postRequest<ApiResponse>(`/post/update/${activeRoom.id}`, { data: updated });
       ResponseMessage(res);
@@ -229,19 +311,28 @@ export default function AdminDashboard() {
     }
   };
 
+  // Status transition handler for reports (handles PENDING / REVIEWED / REJECTED)
+  const handleUpdateReportStatus = (reportId: string, oldStatus: string, newStatus: "PENDING" | "REVIEWED" | "REJECTED") => {
+    setLocalReportStatuses(prev => ({ ...prev, [reportId]: newStatus }));
+    setReports(prev => prev.filter(r => r.id !== reportId));
+    setReportsCounts(prev => ({
+      ...prev,
+      [oldStatus]: Math.max(0, (prev[oldStatus] || 0) - 1),
+      [newStatus]: ((prev[newStatus] || 0) + 1)
+    }));
+    toast.success(`Report status updated to ${newStatus}`);
+  };
+
   // Dismiss report action
   const handleDismissReport = (id: string) => {
-    setReports(prev => prev.filter(r => r.id !== id));
-    toast.success("Report dismissed.");
+    handleUpdateReportStatus(id, reportsStatus, "REJECTED");
   };
 
   // Remove reported listing action
   const handleRemoveReported = async (postId: string, reportId: string) => {
-    // Remove listing locally
+    handleUpdateReportStatus(reportId, reportsStatus, "REVIEWED");
     setRooms(prev => prev.filter(r => r.id !== postId));
-    // Remove report locally
-    setReports(prev => prev.filter(r => r.id !== reportId));
-    
+
     setActivityLogs(prev => [
       {
         id: Math.random().toString(),
@@ -251,7 +342,7 @@ export default function AdminDashboard() {
       },
       ...prev
     ]);
-    
+
     try {
       const res = await deleteRequest<ApiResponse>(`/post/delete/${postId}`);
       ResponseMessage(res);
@@ -268,10 +359,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FBFBFA] dark:bg-[#0A0A0A] text-[#0A0A0A] dark:text-[#F3F4F6] transition-colors duration-300">
-      
+
       {/* Primary Dashboard Panel Shell */}
       <div className="max-w-[1400px] w-full mx-auto px-4 md:px-8 py-8 flex flex-col lg:flex-row gap-8">
-        
+
         {/* ============================================================
             SIDEBAR PANEL
         ============================================================ */}
@@ -279,9 +370,10 @@ export default function AdminDashboard() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           roomsCount={rooms.length}
-          reportsCount={reports.length}
+          reportsCount={reportsCounts.PENDING || 0}
           articlesCount={10}
           usersCount={users.length}
+          notificationsCount={unreadNotificationsCount}
           user={user}
         />
 
@@ -289,7 +381,7 @@ export default function AdminDashboard() {
             MAIN CONTENT AREA
         ============================================================ */}
         <main className="flex-1 flex flex-col gap-8 min-w-0">
-          
+
           {/* ---- OVERVIEW TAB ---- */}
           {activeTab === "overview" && (
             <OverviewTab
@@ -302,14 +394,7 @@ export default function AdminDashboard() {
 
           {/* ---- LISTINGS MANAGER TAB ---- */}
           {activeTab === "listings" && (
-            <ListingsTab
-              rooms={rooms}
-              loadingRooms={loadingRooms}
-              onAddListingClick={() => setShowAddModal(true)}
-              onEditListingClick={triggerEdit}
-              onDeleteListingClick={triggerDelete}
-              onToggleTrendingClick={handleToggleTrending}
-            />
+            <ListingsTab />
           )}
 
           {/* ---- ANALYTICS TAB ---- */}
@@ -321,8 +406,22 @@ export default function AdminDashboard() {
           {activeTab === "reports" && (
             <ReportsTab
               reports={reports}
-              onDismissReport={handleDismissReport}
+              statusCounts={reportsCounts}
+              currentStatus={reportsStatus}
+              onStatusChange={(status: any) => {
+                setReportsStatus(status);
+                setReportsPage(1);
+              }}
+              onUpdateReportStatus={handleUpdateReportStatus}
               onRemoveReported={handleRemoveReported}
+              isLoading={isLoadingReports}
+              pagination={{
+                currentPage: reportsPage,
+                totalPages: reportsTotalPages,
+                hasNextPage: reportsPage < reportsTotalPages,
+                hasPrevPage: reportsPage > 1,
+                onPageChange: setReportsPage
+              }}
             />
           )}
 
@@ -330,6 +429,13 @@ export default function AdminDashboard() {
           {activeTab === "articles" && (
             <ArticlesTab
               adminName={user?.name || "Admin Staff"}
+            />
+          )}
+
+          {/* ---- NOTIFICATIONS TAB ---- */}
+          {activeTab === "notifications" && (
+            <NotificationsTab
+              onUnreadCountChange={(count) => setUnreadNotificationsCount(count)}
             />
           )}
 
@@ -355,11 +461,11 @@ export default function AdminDashboard() {
       {showAddModal && (
         <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-[550px] bg-white dark:bg-[#0A0A0A] rounded-[36px] overflow-hidden shadow-2xl border border-transparent dark:border-white/10 relative max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-300">
-            
+
             {/* Header overlay */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-[#0A0A0A]/5 dark:border-white/10 shrink-0 bg-white dark:bg-[#0A0A0A]">
               <span className="text-[10px] font-black tracking-[0.3em] text-[#FF5211] uppercase">ADMIN LISTING CREATOR</span>
-              <button 
+              <button
                 onClick={() => setShowAddModal(false)}
                 className="p-2 rounded-full hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-all cursor-pointer"
               >
@@ -369,7 +475,7 @@ export default function AdminDashboard() {
 
             {/* Scrolling Form Body */}
             <div className="flex-1 overflow-y-auto p-2 bg-[#FBFBFA] dark:bg-[#0A0A0A]">
-              <PostListingForm 
+              <PostListingForm
                 isInline={true}
                 onBack={() => setShowAddModal(false)}
                 onSuccess={() => {
@@ -391,16 +497,16 @@ export default function AdminDashboard() {
       {showEditModal && (
         <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-[500px] bg-white dark:bg-[#121214] rounded-[36px] overflow-hidden shadow-2xl border border-transparent dark:border-white/10 animate-in zoom-in-95 duration-300">
-            
+
             <form onSubmit={handleEditSubmit} className="flex flex-col max-h-[85vh]">
-              
+
               {/* Modal Header */}
               <div className="px-6 py-5 border-b border-[#0A0A0A]/5 dark:border-white/10 flex items-center justify-between shrink-0">
                 <div className="flex flex-col">
                   <span className="text-[9px] font-black tracking-widest text-[#FF5211] uppercase">MODIFY SYSTEM ENTRY</span>
                   <span className="font-bold text-sm truncate max-w-[280px]">Edit: {activeRoom?.name}</span>
                 </div>
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
                   className="p-2 rounded-full hover:bg-[#F3F4F6] dark:hover:bg-white/5 transition-all cursor-pointer"
@@ -411,7 +517,7 @@ export default function AdminDashboard() {
 
               {/* Modal Inputs Body */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                
+
                 <div className="flex flex-col gap-2">
                   <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Stay Title</label>
                   <input
@@ -501,14 +607,30 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Owner Name</label>
-                  <input
-                    type="text"
-                    value={editOwner}
-                    onChange={(e) => setEditOwner(e.target.value)}
-                    className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Owner Name</label>
+                    <input
+                      type="text"
+                      value={editOwner}
+                      onChange={(e) => setEditOwner(e.target.value)}
+                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black tracking-wider text-slate-400 uppercase px-1">Listing Status</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="w-full h-12 px-4 rounded-xl bg-[#F3F4F6] dark:bg-white/5 border border-transparent focus:border-[#FF5211]/30 focus:outline-none text-xs font-bold cursor-pointer"
+                    >
+                      <option className="dark:bg-[#121214]" value="ACTIVE">ACTIVE</option>
+                      <option className="dark:bg-[#121214]" value="UNDER_REVIEW">UNDER REVIEW</option>
+                      <option className="dark:bg-[#121214]" value="HIDDEN">HIDDEN</option>
+                      <option className="dark:bg-[#121214]" value="REMOVED">REMOVED</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -551,7 +673,7 @@ export default function AdminDashboard() {
       {showDeleteDialog && (
         <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-[420px] bg-white dark:bg-[#121214] rounded-[36px] overflow-hidden shadow-2xl border border-transparent dark:border-white/10 p-6 flex flex-col gap-6 text-center animate-in zoom-in-95 duration-200">
-            
+
             <div className="w-16 h-16 rounded-full bg-red-500/5 text-red-500 flex items-center justify-center mx-auto">
               <Trash2 size={28} />
             </div>

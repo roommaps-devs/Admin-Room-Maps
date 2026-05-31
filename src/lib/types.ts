@@ -1,3 +1,10 @@
+export enum PostStatus {
+  ACTIVE = "ACTIVE",
+  UNDER_REVIEW = "UNDER_REVIEW",
+  HIDDEN = "HIDDEN",
+  REMOVED = "REMOVED"
+}
+
 export interface Room {
   id: string;
   name: string;
@@ -26,6 +33,7 @@ export interface Room {
   createdByEmail?: string;
   createdAt?: string;
   availabilityStatus?: string;
+  status?: PostStatus;
 }
 
 export interface User {

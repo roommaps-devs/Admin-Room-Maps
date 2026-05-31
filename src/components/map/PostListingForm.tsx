@@ -473,6 +473,7 @@ export default function PostListingForm({
         category: 'RENT', // As requested: "in this api name is require and for category use RENT"
         availabilityStatus: 'Available',
         isTrending: false,
+        status: 'ACTIVE',
         bhk: data.bhk || '2 BHK',
         gender: data.gender || 'Male',
         createdByEmail: user?.email || 'admin@gmail.com',

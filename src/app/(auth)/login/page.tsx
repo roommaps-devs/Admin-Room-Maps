@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { postRequest, getRequest } from "@/lib/apiCall";
 import { ResponseMessage, catchResponseMessage, ApiResponse } from "@/components/ResponseMessage";
 import { clearUser, setUser } from "@/store/userSlice";
+import { getFcmToken } from "@/lib/firebase";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -129,11 +130,14 @@ const onSubmit = async (data: LoginSchema) => {
   setLoading(true);
 
   try {
+    const fcmToken = await getFcmToken();
     const res = await postRequest<ApiResponse<any>>(
       "/auth/login",
       {
         email: data.email,
         password: data.password,
+        fcmToken: fcmToken,
+        deviceType: "web"
       }
     );
 
