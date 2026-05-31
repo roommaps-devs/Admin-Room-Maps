@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Building2, PieChart, AlertTriangle, BookOpen, Users } from "lucide-react";
+import { LayoutDashboard, Building2, PieChart, AlertTriangle, BookOpen, Users, Bell } from "lucide-react";
 
-type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles" | "users";
+type DashboardTab = "overview" | "listings" | "analytics" | "reports" | "articles" | "users" | "notifications";
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -12,6 +12,7 @@ interface DashboardSidebarProps {
   reportsCount: number;
   articlesCount: number;
   usersCount: number;
+  notificationsCount: number;
   user: any;
 }
 
@@ -22,6 +23,7 @@ export default function DashboardSidebar({
   reportsCount,
   articlesCount,
   usersCount,
+  notificationsCount,
   user
 }: DashboardSidebarProps) {
   return (
@@ -135,6 +137,25 @@ export default function DashboardSidebar({
             }`}>
               {usersCount}
             </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("notifications")}
+            className={`flex items-center gap-3.5 w-full px-4 py-3.5 rounded-2xl text-[13px] font-black tracking-wide uppercase transition-all duration-300 cursor-pointer ${
+              activeTab === "notifications" 
+                ? "bg-[#FF5211] text-white shadow-lg shadow-orange-500/20" 
+                : "text-[#64748b] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F3F4F6] dark:hover:bg-white/5"
+            }`}
+          >
+            <Bell size={18} />
+            Notifications
+            {notificationsCount > 0 && (
+              <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                activeTab === "notifications" ? "bg-white/20 text-white" : "bg-blue-500/10 text-blue-500"
+              }`}>
+                {notificationsCount}
+              </span>
+            )}
           </button>
         </nav>
         

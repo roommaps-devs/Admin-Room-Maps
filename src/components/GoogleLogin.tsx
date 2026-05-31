@@ -66,7 +66,7 @@
 
 "use client";
 
-import { auth } from "@/lib/firebase";
+import { auth, getFcmToken } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setCookie } from "cookies-next";
@@ -94,13 +94,19 @@ export default function GoogleLogin() {
       // Firebase JWT Token
       const token = await user.getIdToken();
 
+      const fcmToken = await getFcmToken();
+
       // Backend API Call
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/auth/google`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ 
+          token,
+          fcmToken: fcmToken,
+          deviceType: "web"
+        }),
       });
 
       const data = await response.json();

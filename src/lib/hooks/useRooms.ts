@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getRooms } from '@/lib/data';
-import { Room } from '@/lib/types';
+import { Room, PostStatus } from '@/lib/types';
 import { getRequest, postRequest } from '../apiCall';
 
 // Memory cache pointers for single-fetch promise deduplication and static caching
@@ -86,7 +86,16 @@ export function useRooms() {
           }
 
           if (rawData.length > 0 || (res && (Array.isArray(res) || res.success))) {
-            const mappedRooms: Room[] = rawData.map((item: any) => {
+            const filteredRawData = rawData.filter((item: any) => 
+              item && 
+              typeof item === 'object' && 
+              item.name && 
+              item.owner && 
+              item.phone && 
+              item.city
+            );
+
+            const mappedRooms: Room[] = filteredRawData.map((item: any) => {
               const firstImageObj = item.images?.[0];
               const rawImg = firstImageObj?.uploadUrl || 
                              firstImageObj?.url || 
@@ -101,7 +110,7 @@ export function useRooms() {
                 : [];
 
               return {
-                id: item.id || item._id || item.postId || String(item.createdAt || Math.random()),
+                id: item.id,
                 name: item.name || item.title || 'Room Listing',
                 city: item.city || 'Chandigarh',
                 state: item.state || 'Punjab',
@@ -120,7 +129,8 @@ export function useRooms() {
                 furnished: item.furnished || 'Unfurnished',
                 bhk: item.bhk || '1 BHK',
                 gender: item.gender,
-                createdAt: item.createdAt
+                createdAt: item.createdAt,
+                status: (item.status ? String(item.status).toUpperCase() : 'ACTIVE') as PostStatus
               };
             });
             cachedRooms = mappedRooms;
